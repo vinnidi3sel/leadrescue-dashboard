@@ -11,67 +11,26 @@ const SAMPLE = {
     address_line2: "El Dorado Hills, CA 95762",
     how_found: 'Google — "AC repair near me"'
   },
-  priority: {
-    tier: "Urgent",
-    reason: "Heat advisory · elderly resident · getting worse"
-  },
+  priority: { tier: "Urgent", reason: "Heat advisory · elderly resident · getting worse" },
   callback: {
-    time: "4–6 PM",
-    period: "Afternoon",
-    days: ["Tue"],
+    time: "4–6 PM", period: "Afternoon", days: ["Tue"],
     note: "Reach her today — \"after 4 is best, I'm home from work by then\""
   },
   recap: "Margaret called the main line at 2:14 PM; it rang out and Voice AI answered. She described it plainly — <q>my air conditioner's running but it's just blowing warm air</q> — and added <q>it started this morning and now the house is up to 84 degrees.</q> She raised the urgency herself: <q>my mom lives with me, she's elderly, and this heat is really hard on her.</q> When asked the best way to reach her, she said <q>call or text is fine, but after 4 is best — I'm home from work by then.</q>",
   tone_read: "Anxious and direct — this isn't a price-shopper. She's high-intent and time-sensitive, and named the urgency herself before being asked. Treat as same-day: call back at the top of the 4–6 PM window and open with soonest availability, not pricing.",
-  problem: {
-    title: "A/C Not Cooling",
-    detail: "Running but blowing warm air · 84°F indoor · started this morning",
-    quote: "it's just blowing warm air"
-  }
+  problem: { title: "A/C Not Cooling", detail: "Running but blowing warm air · 84°F indoor · started this morning", quote: "it's just blowing warm air" }
 };
 
 const DAY_KEYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const DAY_LABELS = ["M","T","W","T","F","S","S"];
-
 const TIERS = ["Emergency","Urgent","Standard","Quote"];
+
 const TIER_COLORS = {
-  Emergency: { border:"#dc5b4e", bg:"rgba(220,91,78,.12)", dot:"#dc5b4e", text:"#f0a59b" },
-  Urgent:    { border:"#e2884a", bg:"rgba(226,136,74,.12)", dot:"#e2884a", text:"#f3c59c" },
-  Standard:  { border:"#82a0ba", bg:"rgba(130,160,186,.12)", dot:"#82a0ba", text:"#bcd0e0" },
-  Quote:     { border:"#7c8e9c", bg:"rgba(124,142,156,.1)",  dot:"#7c8e9c", text:"#aebfcc" }
+  Emergency: { border:"#dc5b4e", bg:"rgba(220,91,78,.12)", dot:"#dc5b4e", text:"#f0a59b", title:"#f0a59b" },
+  Urgent:    { border:"#e2884a", bg:"rgba(226,136,74,.12)", dot:"#e2884a", text:"#f3c59c", title:"#e2884a" },
+  Standard:  { border:"#378add", bg:"rgba(55,138,221,.08)", dot:"#378add", text:"#82a0ba", title:"#82a0ba" },
+  Quote:     { border:"#4a7a65", bg:"rgba(74,122,101,.1)",  dot:"#4a7a65", text:"#7fad95", title:"#7fad95" }
 };
-
-const PERIOD_ICON = (
-  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#e6b074" strokeWidth="1.1" strokeLinecap="round">
-    <circle cx="6" cy="6" r="2.4"/>
-    <line x1="6" y1="1" x2="6" y2="2.4"/><line x1="6" y1="9.6" x2="6" y2="11"/>
-    <line x1="1" y1="6" x2="2.4" y2="6"/><line x1="9.6" y1="6" x2="11" y2="6"/>
-    <line x1="2.5" y1="2.5" x2="3.4" y2="3.4"/><line x1="8.6" y1="8.6" x2="9.5" y2="9.5"/>
-    <line x1="2.5" y1="9.5" x2="3.4" y2="8.6"/><line x1="8.6" y1="3.4" x2="9.5" y2="2.5"/>
-  </svg>
-);
-
-const MOON_ICON = (
-  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#e6b074" strokeWidth="1.1" strokeLinecap="round">
-    <path d="M10 7.5A5 5 0 0 1 4.5 2a5 5 0 1 0 5.5 5.5z"/>
-  </svg>
-);
-
-const NIGHT_ICON = (
-  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#e6b074" strokeWidth="1.1" strokeLinecap="round">
-    <circle cx="6" cy="6" r="2.8"/><line x1="6" y1="1" x2="6" y2="2.2"/>
-    <line x1="6" y1="9.8" x2="6" y2="11"/><line x1="1" y1="6" x2="2.2" y2="6"/>
-    <line x1="9.8" y1="6" x2="11" y2="6"/>
-  </svg>
-);
-
-function periodIcon(p) {
-  if (!p) return PERIOD_ICON;
-  const lp = p.toLowerCase();
-  if (lp === "evening" || lp === "night") return MOON_ICON;
-  if (lp === "morning") return NIGHT_ICON;
-  return PERIOD_ICON;
-}
 
 function isDayActive(dayKey, days) {
   if (!days || days.length === 0) return false;
@@ -85,14 +44,8 @@ function isDayActive(dayKey, days) {
   });
 }
 
-function isTodayKey(dayKey, days) {
-  if (!days) return false;
-  return days.some(d => d.toLowerCase() === "today") && dayKey === "Tue";
-}
-
 function RecapHtml({ html }) {
   const parts = [];
-  let rest = html;
   const re = /<q>(.*?)<\/q>/g;
   let m, last = 0;
   while ((m = re.exec(html)) !== null) {
@@ -102,7 +55,7 @@ function RecapHtml({ html }) {
   }
   if (last < html.length) parts.push({ type:"text", val: html.slice(last) });
   return (
-    <p style={{fontSize:16,lineHeight:1.68,color:"#aebfcc",margin:0}}>
+    <p style={{fontSize:13,lineHeight:1.65,color:"#aebfcc",margin:0}}>
       {parts.map((p,i) => p.type === "q"
         ? <strong key={i} style={{color:"#eef3f7",fontWeight:700}}>
             <span style={{color:"#c89456"}}>"</span>{p.val}<span style={{color:"#c89456"}}>"</span>
@@ -127,32 +80,18 @@ function ShieldLogo() {
 
 function ACIllustration() {
   return (
-    <svg width="214" height="200" viewBox="0 0 160 160" fill="none">
+    <svg width="160" height="140" viewBox="0 0 160 160" fill="none">
       <path d="M34 32 q7 -10 14 0 t14 0" stroke="#e2884a" strokeWidth="2.4" fill="none"/>
       <path d="M70 28 q7 -10 14 0 t14 0" stroke="#e2884a" strokeWidth="2.4" fill="none"/>
       <path d="M52 18 q7 -10 14 0 t14 0" stroke="#e2884a" strokeWidth="2" fill="none" opacity=".7"/>
-      <path d="M96 32 q6 -9 12 0 t12 0" stroke="#e2884a" strokeWidth="2" fill="none" opacity=".6"/>
       <rect x="20" y="48" width="104" height="100" rx="4" stroke="#82a0ba" strokeWidth="1.6" fill="#141d25"/>
       <rect x="20" y="48" width="104" height="20" fill="#1d2836" stroke="#82a0ba" strokeWidth="1.6"/>
-      <line x1="30" y1="58" x2="114" y2="58" stroke="#56697b" strokeWidth="1"/>
-      <circle cx="27" cy="75" r="1.6" fill="#56697b"/><circle cx="117" cy="75" r="1.6" fill="#56697b"/>
-      <circle cx="27" cy="141" r="1.6" fill="#56697b"/><circle cx="117" cy="141" r="1.6" fill="#56697b"/>
       <circle cx="72" cy="104" r="32" stroke="#82a0ba" strokeWidth="1.6"/>
       <circle cx="72" cy="104" r="26" stroke="#56697b" strokeWidth="1"/>
-      <path d="M72 104 Q89 87 99 98 M72 104 Q55 87 45 98 M72 104 Q89 121 99 110 M72 104 Q55 121 45 110 M72 104 Q92 104 98 91 M72 104 Q52 104 46 117" stroke="#56697b" strokeWidth="1.3" fill="none"/>
       <circle cx="72" cy="104" r="4.5" fill="#c89456"/>
-      <line x1="29" y1="78" x2="29" y2="138" stroke="#56697b" strokeWidth="1"/>
-      <line x1="33" y1="82" x2="33" y2="134" stroke="#56697b" strokeWidth=".8" opacity=".55"/>
-      <line x1="115" y1="78" x2="115" y2="138" stroke="#56697b" strokeWidth="1"/>
-      <line x1="111" y1="82" x2="111" y2="134" stroke="#56697b" strokeWidth=".8" opacity=".55"/>
-      <rect x="31" y="148" width="11" height="6" fill="#1d2836" stroke="#56697b" strokeWidth="1"/>
-      <rect x="102" y="148" width="11" height="6" fill="#1d2836" stroke="#56697b" strokeWidth="1"/>
       <rect x="140" y="46" width="9" height="60" rx="4.5" stroke="#82a0ba" strokeWidth="1.4" fill="#0b1014"/>
       <circle cx="144.5" cy="114" r="8" fill="#e2884a"/>
       <rect x="142" y="78" width="5" height="36" rx="2.5" fill="#e2884a"/>
-      <line x1="151" y1="56" x2="154" y2="56" stroke="#56697b" strokeWidth="1"/>
-      <line x1="151" y1="68" x2="154" y2="68" stroke="#56697b" strokeWidth="1"/>
-      <line x1="151" y1="80" x2="154" y2="80" stroke="#56697b" strokeWidth="1"/>
       <circle cx="112" cy="56" r="9.5" fill="#0b1014" stroke="#e2884a" strokeWidth="1.7"/>
       <path d="M112 51 v5.5 M112 59.5 v.6" stroke="#e2884a" strokeWidth="1.9" strokeLinecap="round"/>
     </svg>
@@ -161,7 +100,7 @@ function ACIllustration() {
 
 function PlumbingIllustration() {
   return (
-    <svg width="214" height="200" viewBox="0 0 160 160" fill="none">
+    <svg width="160" height="140" viewBox="0 0 160 160" fill="none">
       <rect x="60" y="20" width="14" height="60" rx="3" stroke="#82a0ba" strokeWidth="1.6" fill="#141d25"/>
       <rect x="86" y="20" width="14" height="60" rx="3" stroke="#82a0ba" strokeWidth="1.6" fill="#141d25"/>
       <rect x="55" y="78" width="50" height="14" rx="3" stroke="#82a0ba" strokeWidth="1.6" fill="#1d2836"/>
@@ -178,13 +117,10 @@ function PlumbingIllustration() {
 
 function RoofingIllustration() {
   return (
-    <svg width="214" height="200" viewBox="0 0 160 160" fill="none">
+    <svg width="160" height="140" viewBox="0 0 160 160" fill="none">
       <polygon points="80,20 140,80 20,80" stroke="#82a0ba" strokeWidth="1.6" fill="#1d2836"/>
-      <line x1="80" y1="20" x2="80" y2="80" stroke="#56697b" strokeWidth="1" strokeDasharray="4,3"/>
       <rect x="25" y="80" width="110" height="60" rx="2" stroke="#82a0ba" strokeWidth="1.6" fill="#141d25"/>
       <rect x="60" y="100" width="40" height="40" rx="2" stroke="#56697b" strokeWidth="1.2" fill="#1d2836"/>
-      <line x1="80" y1="100" x2="80" y2="140" stroke="#56697b" strokeWidth=".8"/>
-      <line x1="60" y1="120" x2="100" y2="120" stroke="#56697b" strokeWidth=".8"/>
       <path d="M30 50 q5 -6 10 0 t10 0 t10 0" stroke="#378add" strokeWidth="2" fill="none" opacity=".8"/>
       <path d="M45 38 q5 -6 10 0 t10 0" stroke="#378add" strokeWidth="1.6" fill="none" opacity=".6"/>
       <circle cx="112" cy="56" r="9.5" fill="#0b1014" stroke="#e2884a" strokeWidth="1.7"/>
@@ -193,9 +129,50 @@ function RoofingIllustration() {
   );
 }
 
+function FurnaceIllustration() {
+  return (
+    <svg width="160" height="140" viewBox="0 0 160 160" fill="none">
+      <rect x="40" y="30" width="70" height="110" rx="4" stroke="#82a0ba" strokeWidth="1.6" fill="#141d25"/>
+      <rect x="50" y="45" width="50" height="35" rx="2" stroke="#56697b" strokeWidth="1.2" fill="#1d2836"/>
+      <circle cx="75" cy="110" r="12" stroke="#e2884a" strokeWidth="1.6" fill="#0b1014"/>
+      <path d="M75 102 v8 M75 114 v2" stroke="#e2884a" strokeWidth="1.9" strokeLinecap="round"/>
+      <path d="M60 62 q5 -8 15 0 t15 0" stroke="#e2884a" strokeWidth="1.8" fill="none"/>
+      <circle cx="112" cy="56" r="9.5" fill="#0b1014" stroke="#dc5b4e" strokeWidth="1.7"/>
+      <path d="M112 51 v5.5 M112 59.5 v.6" stroke="#dc5b4e" strokeWidth="1.9" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+function ElectricalIllustration() {
+  return (
+    <svg width="160" height="140" viewBox="0 0 160 160" fill="none">
+      <rect x="55" y="25" width="50" height="90" rx="3" stroke="#82a0ba" strokeWidth="1.6" fill="#141d25"/>
+      <rect x="63" y="35" width="34" height="20" rx="2" stroke="#56697b" strokeWidth="1" fill="#1d2836"/>
+      <line x1="80" y1="70" x2="80" y2="100" stroke="#e6b074" strokeWidth="2"/>
+      <path d="M68 70 L80 50 L92 70 L84 70 L84 90 L76 90 L76 70 Z" stroke="#e6b074" strokeWidth="1.5" fill="rgba(200,148,86,.15)"/>
+      <circle cx="112" cy="56" r="9.5" fill="#0b1014" stroke="#e2884a" strokeWidth="1.7"/>
+      <path d="M112 51 v5.5 M112 59.5 v.6" stroke="#e2884a" strokeWidth="1.9" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+function WaterHeaterIllustration() {
+  return (
+    <svg width="160" height="140" viewBox="0 0 160 160" fill="none">
+      <rect x="50" y="25" width="55" height="110" rx="6" stroke="#82a0ba" strokeWidth="1.6" fill="#141d25"/>
+      <circle cx="77" cy="80" r="22" stroke="#378add" strokeWidth="1.4" fill="rgba(55,138,221,.08)"/>
+      <path d="M70 80 q4 -10 14 0" stroke="#378add" strokeWidth="2" fill="none"/>
+      <line x1="77" y1="25" x2="77" y2="15" stroke="#82a0ba" strokeWidth="2"/>
+      <line x1="77" y1="135" x2="77" y2="145" stroke="#82a0ba" strokeWidth="2"/>
+      <circle cx="112" cy="56" r="9.5" fill="#0b1014" stroke="#e2884a" strokeWidth="1.7"/>
+      <path d="M112 51 v5.5 M112 59.5 v.6" stroke="#e2884a" strokeWidth="1.9" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
 function GenericIllustration() {
   return (
-    <svg width="214" height="200" viewBox="0 0 160 160" fill="none">
+    <svg width="160" height="140" viewBox="0 0 160 160" fill="none">
       <circle cx="80" cy="90" r="50" stroke="#82a0ba" strokeWidth="1.6" fill="#141d25"/>
       <circle cx="80" cy="90" r="35" stroke="#56697b" strokeWidth="1"/>
       <path d="M80 55 v35 M80 98 v4" stroke="#e2884a" strokeWidth="2.2" strokeLinecap="round"/>
@@ -207,9 +184,12 @@ function GenericIllustration() {
 
 function ProblemIllustration({ title }) {
   const t = (title || "").toLowerCase();
-  if (t.includes("ac") || t.includes("a/c") || t.includes("air") || t.includes("hvac") || t.includes("cool") || t.includes("heat")) return <ACIllustration />;
-  if (t.includes("plumb") || t.includes("pipe") || t.includes("water") || t.includes("leak") || t.includes("drain")) return <PlumbingIllustration />;
+  if (t.includes("ac") || t.includes("a/c") || t.includes("air") || t.includes("hvac") || t.includes("cool")) return <ACIllustration />;
+  if (t.includes("furnace") || t.includes("heat") || t.includes("boiler")) return <FurnaceIllustration />;
+  if (t.includes("plumb") || t.includes("pipe") || t.includes("water") || t.includes("leak") || t.includes("drain") || t.includes("flood")) return <PlumbingIllustration />;
   if (t.includes("roof") || t.includes("shingle") || t.includes("gutter")) return <RoofingIllustration />;
+  if (t.includes("electric") || t.includes("power") || t.includes("outlet") || t.includes("breaker")) return <ElectricalIllustration />;
+  if (t.includes("water heater") || t.includes("hot water")) return <WaterHeaterIllustration />;
   return <GenericIllustration />;
 }
 
@@ -223,58 +203,88 @@ function fmtRecv() {
   return `${days[NOW.getDay()]} ${MONTHS[NOW.getMonth()]} ${NOW.getDate()} · ${NOW.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}`;
 }
 
+const IC = {
+  phone:   { cls:"ic-amber", icon:"ti-device-mobile" },
+  contact: { cls:"ic-blue",  icon:"ti-message-dots" },
+  email:   { cls:"ic-teal",  icon:"ti-at" },
+  address: { cls:"ic-coral", icon:"ti-map-pin" },
+  found:   { cls:"ic-sage",  icon:"ti-antenna" },
+  callback:{ cls:"ic-purple",icon:"ti-clock" },
+  recap:   { cls:"ic-blue",  icon:"ti-file-description" },
+  problem: { cls:"ic-amber", icon:"ti-tool" },
+  eye:     { cls:"ic-amber", icon:"ti-eye" },
+};
+
 const css = `
-  .lr-card{width:1000px;max-width:100%;margin:0 auto;position:relative;border:1px solid #2b3a47;overflow:hidden;
-    background:linear-gradient(180deg,#101921 0%,#0d141b 100%);font-family:'Liberation Sans','DejaVu Sans',Arial,sans-serif;}
-  .lr-grid{background-image:linear-gradient(rgba(130,160,186,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(130,160,186,.045) 1px,transparent 1px);background-size:42px 42px;}
-  .lr-crop{position:absolute;width:16px;height:16px;border-color:#c89456;opacity:.7;z-index:3}
-  .lr-crop.tl{top:14px;left:14px;border-left:2px solid;border-top:2px solid}
-  .lr-crop.tr{top:14px;right:14px;border-right:2px solid;border-top:2px solid}
-  .lr-crop.bl{bottom:14px;left:14px;border-left:2px solid;border-bottom:2px solid}
-  .lr-crop.br{bottom:14px;right:14px;border-right:2px solid;border-bottom:2px solid}
-  .lr-pad{position:relative;padding:40px 44px 34px}
+  .lr-wrap{width:1000px;max-width:100%;margin:0 auto}
+  .lr-card{position:relative;border:1px solid #2b3a47;overflow:hidden;background:linear-gradient(180deg,#101921 0%,#0d141b 100%);font-family:'Liberation Sans','DejaVu Sans',Arial,sans-serif}
+  .lr-grid{background-image:linear-gradient(rgba(130,160,186,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(130,160,186,.04) 1px,transparent 1px);background-size:42px 42px}
+  .lr-crop{position:absolute;width:14px;height:14px;border-color:#c89456;opacity:.7;z-index:3}
+  .lr-crop.tl{top:12px;left:12px;border-left:2px solid;border-top:2px solid}
+  .lr-crop.tr{top:12px;right:12px;border-right:2px solid;border-top:2px solid}
+  .lr-crop.bl{bottom:12px;left:12px;border-left:2px solid;border-bottom:2px solid}
+  .lr-crop.br{bottom:12px;right:12px;border-right:2px solid;border-bottom:2px solid}
+  .lr-pad{position:relative;padding:32px 36px 28px}
   .lr-mono{font-family:'DejaVu Sans Mono','Liberation Mono',monospace}
   .lr-serif{font-family:'Liberation Serif','DejaVu Serif',Georgia,serif}
-  .lr-badge{display:inline-flex;align-items:center;gap:9px;padding:8px 14px;border:1px solid #c89456;background:rgba(200,148,86,.1);border-radius:2px;margin-bottom:17px}
-  .lr-badge .d{width:8px;height:8px;border-radius:50%;background:#e6b074;box-shadow:0 0 10px #c89456}
-  .lr-badge .x{font-size:11px;letter-spacing:2.5px;color:#e6b074;text-transform:uppercase;font-weight:700}
-  .lr-tier{display:flex;align-items:center;justify-content:center;gap:10px;padding:9px 11px;border:1px solid transparent;border-radius:2px}
-  .lr-tier .td{width:9px;height:9px;border-radius:50%;border:1.5px solid #56697b;background:transparent;flex:none}
-  .lr-tier .tn{font-size:11.5px;letter-spacing:1.5px;color:#7c8e9c;text-transform:uppercase;font-weight:700}
-  .lr-tier.active{flex-direction:column;align-items:center;gap:7px;padding:11px 13px;border-width:1px;border-left-width:3px}
-  .lr-tier.active .trow{display:flex;align-items:center;gap:10px}
-  .lr-tier.active .td{border:none}
-  .lr-tier.active .tn{font-weight:800}
-  .lr-tier.active .tr{text-align:center;font-size:12.5px;color:#aebfcc;line-height:1.32}
-  .lr-day{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:34px;border:1px solid #21303b;border-radius:3px}
-  .lr-day .dl{font-size:10px;color:#7c8e9c;font-weight:700;line-height:1}
-  .lr-day .dot{width:4px;height:4px;border-radius:50%;background:transparent}
-  .lr-day.on{background:rgba(200,148,86,.1);border-color:rgba(200,148,86,.4)}
+  .ic{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px}
+  .ic-amber{background:rgba(200,148,86,.15);color:#e6b074;border:1px solid rgba(200,148,86,.3)}
+  .ic-blue{background:rgba(55,138,221,.12);color:#82a0ba;border:1px solid rgba(130,160,186,.25)}
+  .ic-teal{background:rgba(13,110,86,.15);color:#5cb083;border:1px solid rgba(92,176,131,.25)}
+  .ic-coral{background:rgba(220,91,78,.12);color:#f0a59b;border:1px solid rgba(220,91,78,.2)}
+  .ic-sage{background:rgba(45,74,63,.25);color:#7fad95;border:1px solid rgba(127,173,149,.2)}
+  .ic-purple{background:rgba(83,74,183,.15);color:#afa9ec;border:1px solid rgba(175,169,236,.2)}
+  .lbl{font-size:7.5px;letter-spacing:2px;text-transform:uppercase;color:#56697b;margin-bottom:2px;display:block}
+  .val{font-size:10px;color:#eef3f7;font-weight:500;line-height:1.35}
+  .val-dim{font-size:10px;color:#aebfcc;line-height:1.35}
+  .lr-day{width:22px;height:22px;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid #21303b;background:#141d25}
+  .lr-day .dl{font-size:8px;color:#56697b;font-weight:700;line-height:1}
+  .lr-day.on{background:rgba(200,148,86,.2);border-color:#c89456}
   .lr-day.on .dl{color:#e6b074}
-  .lr-day.today{background:rgba(200,148,86,.2);border-color:#c89456}
-  .lr-day.today .dl{color:#e6b074}
-  .lr-day.today .dot{background:#e6b074}
-  .lr-recap q{quotes:'"' '"';color:#eef3f7;font-weight:700}
-  .lr-recap q::before{content:open-quote;color:#c89456}
-  .lr-recap q::after{content:close-quote;color:#c89456}
-  .lr-prob q{quotes:'"' '"';color:#eef3f7;font-weight:700}
-  .lr-prob q::before{content:open-quote;color:#c89456}
-  .lr-prob q::after{content:close-quote;color:#c89456}
-  .lr-stamp{display:inline-flex;align-items:center;gap:8px;border:1.5px solid #5cb083;padding:7px 13px;border-radius:2px;transform:rotate(-1.5deg)}
-  .json-area{width:100%;height:220px;background:#0b1014;color:#82a0ba;border:1px solid #2b3a47;border-radius:4px;padding:14px;font-family:monospace;font-size:12px;resize:vertical;outline:none}
-  .json-area:focus{border-color:#c89456}
-  .gen-btn{background:rgba(200,148,86,.12);border:1px solid #c89456;color:#e6b074;font-family:monospace;font-size:12px;letter-spacing:2px;text-transform:uppercase;padding:10px 24px;border-radius:2px;cursor:pointer}
+  .lr-tier{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:3px;border:1px solid transparent}
+  .lr-tier.off{background:#141d25;border-color:#21303b;opacity:.35}
+  .lr-tier.active{border-left-width:3px}
+  .lr-tier .tdot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+  .lr-tier .tn{font-size:8px;letter-spacing:1.5px;font-weight:700;text-transform:uppercase}
+  .lr-tier .tr{font-size:8.5px;color:#aebfcc}
+  .lr-stamp{display:inline-flex;align-items:center;gap:8px;border:1.5px solid #5cb083;padding:6px 12px;border-radius:2px;transform:rotate(-1.5deg)}
+  .gen-btn{background:rgba(200,148,86,.12);border:1px solid #c89456;color:#e6b074;font-family:monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:8px 20px;border-radius:2px;cursor:pointer}
   .gen-btn:hover{background:rgba(200,148,86,.22)}
-  .err-box{background:rgba(220,91,78,.12);border:1px solid rgba(220,91,78,.4);color:#f0a59b;font-family:monospace;font-size:12px;padding:12px 16px;border-radius:2px;margin-top:10px}
+  .json-area{width:100%;height:200px;background:#0b1014;color:#82a0ba;border:1px solid #2b3a47;border-radius:4px;padding:12px;font-family:monospace;font-size:11px;resize:vertical;outline:none}
+  .json-area:focus{border-color:#c89456}
+  .err-box{background:rgba(220,91,78,.12);border:1px solid rgba(220,91,78,.4);color:#f0a59b;font-family:monospace;font-size:11px;padding:10px 14px;border-radius:2px;margin-top:8px}
+  .div-h{border:none;border-top:1px solid #21303b;margin:.55rem 0}
+  .div-v{width:1px;background:#21303b;align-self:stretch;flex-shrink:0}
 `;
+
+function IcCircle({ type }) {
+  const { cls, icon } = IC[type] || IC.problem;
+  return <span className={`ic ${cls}`}><i className={`ti ${icon}`} aria-hidden="true" /></span>;
+}
 
 export default function LeadRescueReport() {
   const [jsonInput, setJsonInput] = useState("");
   const [data, setData] = useState(SAMPLE);
   const [error, setError] = useState("");
   const [showInput, setShowInput] = useState(false);
-const [loading, setLoading] = useState(true);
-const [liveData, setLiveData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [liveData, setLiveData] = useState(null);
+
+  useEffect(() => {
+    fetch(`https://xofgjzfofmjziycqprhq.supabase.co/rest/v1/calls?select=*&order=created_at.desc&limit=1`, {
+      headers: {
+        apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvZmdqemZvZm1qeml5Y3FwcmhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NDI1MDcsImV4cCI6MjA5NzMxODUwN30.qdn-YSphrwgMee0vdpPgE1RudBw0Z-zKOBPXmnZ4aY8",
+        Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvZmdqemZvZm1qeml5Y3FwcmhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NDI1MDcsImV4cCI6MjA5NzMxODUwN30.qdn-YSphrwgMee0vdpPgE1RudBw0Z-zKOBPXmnZ4aY8`
+      }
+    })
+    .then(r => r.json())
+    .then(rows => {
+      if (rows && rows.length > 0) setLiveData(rows[0].report_json);
+      setLoading(false);
+    })
+    .catch(() => setLoading(false));
+  }, []);
+
   function handleGenerate() {
     try {
       const parsed = JSON.parse(jsonInput);
@@ -285,281 +295,218 @@ const [liveData, setLiveData] = useState(null);
       setError("Invalid JSON — check the format and try again.");
     }
   }
-useEffect(() => {
-  fetch(`https://xofgjzfofmjziycqprhq.supabase.co/rest/v1/calls?select=*&order=created_at.desc&limit=1`, {
-    headers: {
-      apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvZmdqemZvZm1qeml5Y3FwcmhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NDI1MDcsImV4cCI6MjA5NzMxODUwN30.qdn-YSphrwgMee0vdpPgE1RudBw0Z-zKOBPXmnZ4aY8",
-      Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvZmdqemZvZm1qeml5Y3FwcmhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NDI1MDcsImV4cCI6MjA5NzMxODUwN30.qdn-YSphrwgMee0vdpPgE1RudBw0Z-zKOBPXmnZ4aY8`
-    }
-  })
-  .then(r => r.json())
-  .then(rows => {
-    if (rows && rows.length > 0) {
-      console.log("GOT DATA:", JSON.stringify(rows[0].report_json));
-      setLiveData(rows[0].report_json);
-    } else {
-      console.log("NO ROWS:", JSON.stringify(rows));
-    }
-    setLoading(false);
-  })
-  .catch(() => setLoading(false));
-}, []);
 
-const d = liveData || data;
-  
+  const d = liveData || data;
   const tier = d.priority?.tier || "Standard";
   const tc = TIER_COLORS[tier] || TIER_COLORS.Standard;
   const days = d.callback?.days || [];
   const rptNum = Math.floor(Math.random() * 9000) + 1000;
+  const addrParts = (d.lead?.address_line2 || "").split(",");
+  const city = addrParts[0]?.trim() || "";
+  const stateZip = addrParts.slice(1).join(",").trim() || "";
+
+  if (loading) return (
+    <div style={{background:"#0b1014",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <span style={{fontFamily:"monospace",fontSize:12,color:"#c89456",letterSpacing:2}}>LOADING LATEST CALL...</span>
+    </div>
+  );
 
   return (
-    <div style={{background:"#0b1014",minHeight:"100vh",padding:"32px 16px"}}>
+    <div style={{background:"#0b1014",minHeight:"100vh",padding:"28px 16px"}}>
       <style>{css}</style>
 
-      {/* Input panel toggle */}
-      <div style={{width:1000,maxWidth:"100%",margin:"0 auto 20px",display:"flex",gap:12,alignItems:"center"}}>
-        <button className="gen-btn" onClick={()=>setShowInput(v=>!v)}>
-          {showInput ? "▲ Hide Input" : "▼ Paste JSON"}
+      <div style={{width:1000,maxWidth:"100%",margin:"0 auto 16px",display:"flex",gap:10,alignItems:"center"}}>
+        <button className="gen-btn lr-mono" onClick={()=>setShowInput(v=>!v)}>
+          {showInput ? "▲ Hide" : "▼ Paste JSON"}
         </button>
-        if (loading) return <div style={{color:"#c89456",fontFamily:"monospace",padding:"40px",textAlign:"center"}}>Loading latest call...</div>;
-        {showInput && (
-          <span style={{fontFamily:"monospace",fontSize:11,color:"#56697b",letterSpacing:"1px"}}>
-            PASTE OUTPUT FROM EXTRACTION PROMPT · HIT GENERATE
-          </span>
-        )}
       </div>
 
       {showInput && (
-        <div style={{width:1000,maxWidth:"100%",margin:"0 auto 20px"}}>
-          <textarea
-            className="json-area"
-            placeholder='Paste the raw JSON from the Claude extraction node here…'
-            value={jsonInput}
-            onChange={e=>setJsonInput(e.target.value)}
-          />
-          <div style={{display:"flex",gap:12,marginTop:10,alignItems:"center"}}>
-            <button className="gen-btn" onClick={handleGenerate}>Generate Report →</button>
-            <button className="gen-btn" style={{opacity:.6}} onClick={()=>{setData(SAMPLE);setJsonInput("");setError("");}}>
-              Load Sample
-            </button>
+        <div style={{width:1000,maxWidth:"100%",margin:"0 auto 16px"}}>
+          <textarea className="json-area" placeholder="Paste raw JSON from Claude extraction node…" value={jsonInput} onChange={e=>setJsonInput(e.target.value)}/>
+          <div style={{display:"flex",gap:10,marginTop:8}}>
+            <button className="gen-btn" onClick={handleGenerate}>Generate →</button>
+            <button className="gen-btn" style={{opacity:.6}} onClick={()=>{setData(SAMPLE);setJsonInput("");setError("");}}>Sample</button>
           </div>
           {error && <div className="err-box">{error}</div>}
         </div>
       )}
 
-      {/* REPORT CARD */}
-      <div className="lr-card lr-grid">
+      <div className="lr-card lr-grid lr-wrap">
         <span className="lr-crop tl"/><span className="lr-crop tr"/>
         <span className="lr-crop bl"/><span className="lr-crop br"/>
         <div className="lr-pad">
 
           {/* HEADER */}
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",paddingBottom:20,borderBottom:"1px solid #21303b"}}>
-            <div style={{display:"flex",alignItems:"center",gap:15}}>
-              <ShieldLogo />
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",paddingBottom:18,borderBottom:"1px solid #21303b"}}>
+            <div style={{display:"flex",alignItems:"center",gap:14}}>
+              <ShieldLogo/>
               <div>
-                <div className="lr-serif" style={{fontSize:29,fontWeight:700,letterSpacing:3,color:"#eef3f7",lineHeight:1}}>LEAD RESCUE</div>
-                <div className="lr-mono" style={{fontSize:10,letterSpacing:"3.5px",color:"#c89456",textTransform:"uppercase",marginTop:7}}>Never miss another call</div>
+                <div className="lr-serif" style={{fontSize:26,fontWeight:700,letterSpacing:3,color:"#eef3f7",lineHeight:1}}>LEAD RESCUE</div>
+                <div className="lr-mono" style={{fontSize:9,letterSpacing:"3.5px",color:"#c89456",textTransform:"uppercase",marginTop:6}}>Never miss another call</div>
               </div>
             </div>
-            <div className="lr-mono" style={{textAlign:"right",fontSize:10.5,lineHeight:1.9,color:"#7c8e9c",textTransform:"uppercase",letterSpacing:1}}>
-              <div>RPT&nbsp;<span style={{color:"#aebfcc"}}>·&nbsp;{rptNum}</span></div>
-              <div>RECV&nbsp;<span style={{color:"#aebfcc"}}>{fmtRecv()}</span></div>
-              <div>CHAN&nbsp;<span style={{color:"#aebfcc"}}>INBOUND · VOICE AI</span></div>
+            <div className="lr-mono" style={{textAlign:"right",fontSize:9.5,lineHeight:1.9,color:"#7c8e9c",textTransform:"uppercase",letterSpacing:1}}>
+              <div>RPT <span style={{color:"#aebfcc"}}>· {rptNum}</span></div>
+              <div>RECV <span style={{color:"#aebfcc"}}>{fmtRecv()}</span></div>
+              <div>CHAN <span style={{color:"#aebfcc"}}>INBOUND · VOICE AI</span></div>
             </div>
           </div>
 
           {/* VERDICT */}
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"26px 0 24px"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"22px 0 20px"}}>
             <div>
-              <span className="lr-mono" style={{fontSize:10,letterSpacing:4,color:"#c89456",textTransform:"uppercase",display:"block",marginBottom:7}}>
-                Call Intelligence — Dispatch Report
-              </span>
-              <div className="lr-serif" style={{fontStyle:"italic",fontSize:52,lineHeight:.98,color:"#eef3f7"}}>
+              <span className="lr-mono" style={{fontSize:9,letterSpacing:4,color:"#c89456",textTransform:"uppercase",display:"block",marginBottom:6}}>Call Intelligence — Dispatch Report</span>
+              <div className="lr-serif" style={{fontStyle:"italic",fontSize:46,lineHeight:.98,color:"#eef3f7"}}>
                 Lead <span style={{color:"#e6b074"}}>rescued.</span>
               </div>
-              <div className="lr-mono" style={{fontSize:11,letterSpacing:"1.5px",color:"#7c8e9c",textTransform:"uppercase",marginTop:12}}>
-                Missed on the main line · caught by Voice AI
-              </div>
+              <div className="lr-mono" style={{fontSize:10,letterSpacing:"1.5px",color:"#7c8e9c",textTransform:"uppercase",marginTop:10}}>Missed on the main line · caught by Voice AI</div>
             </div>
-            <div style={{display:"inline-flex",alignItems:"center",gap:9,padding:"11px 18px",border:"1px solid #5cb083",background:"rgba(92,176,131,.12)",borderRadius:2}}>
-              <span style={{width:9,height:9,borderRadius:"50%",background:"#5cb083",boxShadow:"0 0 12px #5cb083",display:"inline-block"}}/>
-              <span className="lr-mono" style={{fontSize:13,letterSpacing:2,color:"#5cb083",textTransform:"uppercase",fontWeight:700}}>Recovered</span>
+            <div style={{display:"inline-flex",alignItems:"center",gap:8,padding:"10px 16px",border:"1px solid #5cb083",background:"rgba(92,176,131,.12)",borderRadius:2}}>
+              <span style={{width:8,height:8,borderRadius:"50%",background:"#5cb083",boxShadow:"0 0 10px #5cb083",display:"inline-block"}}/>
+              <span className="lr-mono" style={{fontSize:12,letterSpacing:2,color:"#5cb083",textTransform:"uppercase",fontWeight:700}}>Recovered</span>
             </div>
           </div>
 
-          {/* SECTION LABEL */}
-          <div style={{display:"flex",alignItems:"center",gap:12,margin:"4px 0 13px"}}>
-            <span className="lr-mono" style={{fontSize:10.5,letterSpacing:3,color:"#82a0ba",textTransform:"uppercase"}}>Read first</span>
+          <div style={{display:"flex",alignItems:"center",gap:10,margin:"2px 0 12px"}}>
+            <span className="lr-mono" style={{fontSize:9.5,letterSpacing:3,color:"#82a0ba",textTransform:"uppercase"}}>Read first</span>
             <span style={{flex:1,height:1,background:"#21303b"}}/>
-            <span className="lr-mono" style={{fontSize:10,letterSpacing:1,color:"#7c8e9c"}}>Lead · priority order</span>
+            <span className="lr-mono" style={{fontSize:9,letterSpacing:1,color:"#7c8e9c"}}>Lead · priority order</span>
           </div>
 
-          {/* BOARD */}
-          <div style={{display:"grid",gridTemplateColumns:"1.55fr 1fr",gap:12}}>
-            {/* Lead box */}
-            <div style={{background:"#1d2836",border:"1px solid #21303b",borderLeft:"3px solid #c89456",padding:"22px 28px"}}>
-              <div className="lr-badge"><span className="d"/><span className="x lr-mono">New Lead</span></div>
-              <div className="lr-serif" style={{fontStyle:"italic",fontSize:46,fontWeight:400,color:"#eef3f7",lineHeight:1.02}}>
-                {d.lead?.name || "Unknown Caller"}
+          {/* BOX 1 — LEAD */}
+          <div style={{background:"#1d2836",border:"1px solid #21303b",borderLeft:"3px solid #c89456",padding:"18px 22px",marginBottom:12}}>
+            <div style={{textAlign:"center",paddingBottom:".65rem",borderBottom:"1px solid #21303b",marginBottom:".65rem"}}>
+              <div style={{display:"inline-flex",alignItems:"center",gap:5,padding:"2px 9px",border:"1px solid #c89456",background:"rgba(200,148,86,.1)",borderRadius:2,marginBottom:7}}>
+                <span style={{width:5,height:5,borderRadius:"50%",background:"#e6b074",display:"inline-block"}}/>
+                <span className="lr-mono" style={{fontSize:8,letterSpacing:2,color:"#e6b074",textTransform:"uppercase",fontWeight:700}}>New Lead</span>
               </div>
-              <div className="lr-mono" style={{fontSize:10,letterSpacing:"1.5px",color:"#7c8e9c",textTransform:"uppercase",marginTop:12}}>
-                {d.lead?.descriptor || ""}
+              <div className="lr-serif" style={{fontStyle:"italic",fontSize:36,color:"#eef3f7",lineHeight:1,marginBottom:4}}>{d.lead?.name || "Unknown Caller"}</div>
+              <div className="lr-mono" style={{fontSize:8,letterSpacing:"1.5px",color:"#56697b",textTransform:"uppercase"}}>{d.lead?.descriptor || ""}</div>
+            </div>
+
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"9px 14px",marginBottom:".55rem"}}>
+              {[
+                {type:"phone", label:"Phone", val:d.lead?.phone},
+                {type:"contact", label:"Contact", val:d.lead?.preferred_contact},
+                {type:"email", label:"Email", val:d.lead?.email},
+              ].map(({type,label,val})=>(
+                <div key={type} style={{display:"flex",gap:7,alignItems:"flex-start"}}>
+                  <IcCircle type={type}/>
+                  <div><span className="lbl lr-mono">{label}</span><div className="val lr-mono">{val||"Not provided"}</div></div>
+                </div>
+              ))}
+              <div style={{display:"flex",gap:7,alignItems:"flex-start"}}>
+                <IcCircle type="address"/>
+                <div>
+                  <span className="lbl lr-mono">Address</span>
+                  <div className="val lr-mono">{d.lead?.address_line1||"Not provided"}</div>
+                  <div className="val-dim lr-mono">{city||""}</div>
+                  <div className="val-dim lr-mono">{stateZip||""}</div>
+                </div>
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"24px 24px",marginTop:24,paddingTop:22,borderTop:"1px solid #21303b"}}>
-                {[
-                  {icon:"phone",label:"Phone",val:d.lead?.phone},
-                  {icon:"chat",label:"Preferred Contact",val:d.lead?.preferred_contact},
-                  {icon:"search",label:"How They Found You",val:d.lead?.how_found},
-                  {icon:"email",label:"Email",val:d.lead?.email},
-                ].map(({icon,label,val},i)=>(
-                  <div key={i} style={{display:"flex",gap:12,alignItems:"flex-start"}}>
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#82a0ba" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" style={{flex:"none",marginTop:1}}>
-                      {icon==="phone" && <><rect x="4.6" y="1.5" width="6.8" height="13" rx="1.6"/><line x1="6.7" y1="12.4" x2="9.3" y2="12.4"/></>}
-                      {icon==="chat" && <path d="M2.5 4.2 A1.7 1.7 0 0 1 4.2 2.5 H11.8 A1.7 1.7 0 0 1 13.5 4.2 V8.5 A1.7 1.7 0 0 1 11.8 10.2 H6.5 L3.5 12.6 V10.2 A1.7 1.7 0 0 1 2.5 8.5 Z"/>}
-                      {icon==="search" && <><circle cx="6.8" cy="6.8" r="4"/><line x1="9.7" y1="9.7" x2="13.5" y2="13.5"/></>}
-                      {icon==="email" && <><rect x="2" y="3.5" width="12" height="9" rx="1.2"/><path d="M2.6 4.6 L8 8.6 L13.4 4.6"/></>}
-                    </svg>
-                    <div>
-                      <div className="lr-mono" style={{fontSize:9,letterSpacing:2,color:"#7c8e9c",textTransform:"uppercase",marginBottom:6}}>{label}</div>
-                      <div className="lr-mono" style={{fontSize:15.5,color:"#eef3f7",lineHeight:1.35,wordBreak:"break-word"}}>{val || "Not provided"}</div>
-                    </div>
-                  </div>
-                ))}
-                {/* Address — full width */}
-                <div style={{gridColumn:"1 / -1",display:"flex",gap:12,alignItems:"flex-start",justifyContent:"center"}}>
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#82a0ba" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" style={{flex:"none",marginTop:1}}>
-                    <path d="M8 14.5 S12.6 9.6 12.6 6.3 A4.6 4.6 0 1 0 3.4 6.3 C3.4 9.6 8 14.5 8 14.5 Z"/>
-                    <circle cx="8" cy="6.3" r="1.8"/>
-                  </svg>
-                  <div style={{textAlign:"center"}}>
-                    <div className="lr-mono" style={{fontSize:9,letterSpacing:2,color:"#7c8e9c",textTransform:"uppercase",marginBottom:6}}>Service Address</div>
-                    <div className="lr-mono" style={{fontSize:15.5,color:"#eef3f7",lineHeight:1.35}}>
-                      {d.lead?.address_line1 || "Not provided"}<br/>{d.lead?.address_line2 || ""}
-                    </div>
-                  </div>
+              <div style={{display:"flex",gap:7,alignItems:"flex-start"}}>
+                <IcCircle type="found"/>
+                <div><span className="lbl lr-mono">How found</span><div className="val">{d.lead?.how_found||"Not provided"}</div></div>
+              </div>
+              <div style={{display:"flex",gap:7,alignItems:"flex-start"}}>
+                <IcCircle type="callback"/>
+                <div>
+                  <span className="lbl lr-mono">Callback</span>
+                  <div className="val lr-mono">{d.callback?.time||"Anytime"} · {days[0]||"Anytime"}</div>
+                  <div className="val-dim lr-mono">{d.callback?.period||""}</div>
                 </div>
               </div>
             </div>
 
-            {/* Right col */}
-            <div style={{display:"flex",flexDirection:"column",gap:12}}>
-              {/* Priority */}
-              <div style={{background:"#18222e",border:"1px solid #21303b",padding:"15px 17px",display:"flex",flexDirection:"column"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:12}}>
-                  <span className="lr-mono" style={{fontSize:9.5,letterSpacing:"2.5px",color:"#7c8e9c",textTransform:"uppercase"}}>Priority</span>
-                  <span className="lr-mono" style={{fontSize:8,letterSpacing:1,color:"#7c8e9c",textTransform:"uppercase"}}>Caller-set · AI-verified</span>
-                </div>
-                <div style={{display:"flex",flexDirection:"column",gap:7}}>
+            <div className="div-h"/>
+
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div>
+                <span className="lbl lr-mono" style={{marginBottom:5}}>Priority</span>
+                <div style={{display:"flex",flexDirection:"column",gap:3}}>
                   {TIERS.map(t => {
                     const isActive = t === tier;
                     const c = TIER_COLORS[t];
-                    return isActive ? (
-                      <div key={t} className="lr-tier active lr-mono" style={{borderColor:`rgba(${hexToRgb(c.border)},.5)`,borderLeftColor:c.border,background:c.bg}}>
-                        <div className="trow">
-                          <span className="td" style={{background:c.dot,boxShadow:`0 0 10px ${c.dot}`}}/>
-                          <span className="tn" style={{color:c.text}}>{t.toUpperCase()}</span>
-                        </div>
-                        <span className="tr">{d.priority?.reason || ""}</span>
-                      </div>
-                    ) : (
-                      <div key={t} className="lr-tier lr-mono">
-                        <span className="td"/><span className="tn">{t.toUpperCase()}</span>
+                    return (
+                      <div key={t} className={`lr-tier lr-mono ${isActive?"active":"off"}`}
+                        style={isActive ? {borderColor:`rgba(${hexToRgb(c.border)},.5)`,borderLeftColor:c.border,background:c.bg} : {}}>
+                        <span className="tdot" style={isActive ? {background:c.dot,boxShadow:`0 0 5px ${c.dot}`} : {background:"#21303b"}}/>
+                        <span className="tn" style={{color:isActive?c.text:"#56697b"}}>{t.toUpperCase()}</span>
+                        {isActive && <span className="tr">{d.priority?.reason||""}</span>}
                       </div>
                     );
                   })}
                 </div>
               </div>
-
-              {/* Callback */}
-              <div style={{background:"#18222e",border:"1px solid #21303b",borderLeft:"3px solid #c89456",padding:"16px 18px",display:"flex",flexDirection:"column",gap:13,flex:1,justifyContent:"center"}}>
-                <div className="lr-mono" style={{fontSize:9.5,letterSpacing:"2.5px",color:"#7c8e9c",textTransform:"uppercase"}}>Best Callback Window</div>
-                <div style={{display:"flex",gap:16,alignItems:"center"}}>
-                  {/* Clock */}
-                  <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:7,flex:"none"}}>
-                    <svg width="62" height="62" viewBox="0 0 64 64" fill="none">
-                      <circle cx="32" cy="32" r="27" stroke="#82a0ba" strokeWidth="1.5" fill="#141d25"/>
-                      <path d="M32 32 L55.4 45.5 A27 27 0 0 1 32 59 Z" fill="rgba(200,148,86,.32)" stroke="#c89456" strokeWidth="1.4" strokeLinejoin="round"/>
-                      <line x1="32" y1="7" x2="32" y2="11" stroke="#7c8e9c" strokeWidth="1.5"/>
-                      <line x1="57" y1="32" x2="53" y2="32" stroke="#7c8e9c" strokeWidth="1.5"/>
-                      <line x1="32" y1="57" x2="32" y2="53" stroke="#7c8e9c" strokeWidth="1.5"/>
-                      <line x1="7" y1="32" x2="11" y2="32" stroke="#7c8e9c" strokeWidth="1.5"/>
-                      <circle cx="32" cy="32" r="1.8" fill="#82a0ba"/>
-                    </svg>
-                    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
-                      <span className="lr-mono" style={{fontSize:12,letterSpacing:".5px",color:"#e6b074",fontWeight:700}}>{d.callback?.time || "Anytime"}</span>
-                      <span className="lr-mono" style={{display:"flex",alignItems:"center",gap:4,fontSize:8.5,letterSpacing:"1.5px",color:"#7c8e9c",textTransform:"uppercase"}}>
-                        {periodIcon(d.callback?.period)}{d.callback?.period || "Anytime"}
-                      </span>
-                    </div>
-                  </div>
-                  {/* Calendar */}
-                  <div style={{flex:1,display:"flex",flexDirection:"column",gap:7}}>
-                    <span className="lr-mono" style={{fontSize:8.5,letterSpacing:"1.5px",color:"#7c8e9c",textTransform:"uppercase"}}>Best day to call</span>
-                    <div style={{display:"flex",gap:5}}>
-                      {DAY_KEYS.map((dk,i)=>{
-                        const on = isDayActive(dk, days);
-                        const today = isTodayKey(dk, days);
-                        const cls = "lr-day lr-mono" + (today?" today":on?" on":"");
-                        return (
-                          <div key={dk} className={cls}>
-                            <span className="dl">{DAY_LABELS[i]}</span>
-                            <span className="dot"/>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+              <div>
+                <span className="lbl lr-mono" style={{marginBottom:5}}>Best day to call</span>
+                <div style={{display:"flex",gap:3,marginBottom:6}}>
+                  {DAY_KEYS.map((dk,i)=>{
+                    const on = isDayActive(dk,days);
+                    return (
+                      <div key={dk} className={`lr-day lr-mono${on?" on":""}`}>
+                        <span className="dl">{DAY_LABELS[i]}</span>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div style={{fontSize:12.5,color:"#aebfcc",lineHeight:1.4}}
-                  dangerouslySetInnerHTML={{__html: (d.callback?.note||"").replace(/"([^"]+)"/g,'"<b style=\'color:#eef3f7\'>$1</b>"')}}
-                />
+                <div style={{fontSize:9,color:"#aebfcc",lineHeight:1.5,padding:"5px 7px",background:"#141d25",border:"1px solid #21303b",borderRadius:3}}>
+                  <span style={{color:"#56697b"}}>Caller: </span>
+                  <span style={{color:"#e6b074"}}>"{d.callback?.note||""}"</span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* LOWER */}
-          <div style={{display:"grid",gridTemplateColumns:"1.45fr 1fr",gap:14,marginTop:14,alignItems:"stretch"}}>
-            {/* Recap */}
-            <div className="lr-recap" style={{background:"#141d25",border:"1px solid #21303b",borderLeft:"3px solid #82a0ba",padding:"22px 26px"}}>
-              <div className="lr-mono" style={{fontSize:10.5,letterSpacing:"2.5px",color:"#aebfcc",textTransform:"uppercase",marginBottom:14}}>
-                What happened on the call <span style={{color:"#7c8e9c",letterSpacing:1}}>— bold = caller's exact words</span>
+          {/* BOX 2 — INCIDENT */}
+          <div style={{background:"#141d25",border:"1px solid #21303b",borderLeft:"3px solid #82a0ba",padding:"18px 22px",display:"flex",gap:0}}>
+            {/* Left — Recap */}
+            <div style={{flex:"1.4",paddingRight:"1.2rem"}}>
+              <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:10}}>
+                <IcCircle type="recap"/>
+                <span className="lbl lr-mono" style={{margin:0}}>What happened on the call</span>
+                <span style={{fontSize:8,color:"#56697b",letterSpacing:1}}>— bold = caller's exact words</span>
               </div>
-              <RecapHtml html={d.recap || ""} />
-              <div style={{marginTop:16,padding:"15px 17px",background:"rgba(200,148,86,.05)",border:"1px solid rgba(200,148,86,.18)",borderRadius:2,fontSize:15,lineHeight:1.55,color:"#aebfcc"}}>
-                <span className="lr-mono" style={{display:"inline-block",fontSize:10,letterSpacing:2,color:"#e6b074",textTransform:"uppercase",background:"rgba(200,148,86,.12)",border:"1px solid rgba(200,148,86,.32)",padding:"4px 9px",borderRadius:2,marginRight:10,verticalAlign:"middle"}}>
-                  Tone read
-                </span>
-                {d.tone_read || ""}
+              <RecapHtml html={d.recap||""}/>
+              <div style={{marginTop:12,padding:"8px 10px",background:"rgba(200,148,86,.05)",border:"1px solid rgba(200,148,86,.18)",borderLeft:"3px solid #c89456",borderRadius:2}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:5}}>
+                  <IcCircle type="eye"/>
+                  <span className="lr-mono" style={{fontSize:7.5,letterSpacing:2,color:"#e6b074",textTransform:"uppercase"}}>Tone read</span>
+                </div>
+                <div style={{fontSize:11.5,color:"#aebfcc",lineHeight:1.55}}>{d.tone_read||""}</div>
               </div>
             </div>
 
-            {/* Problem */}
-            <div className="lr-prob" style={{background:"#18222e",border:"1px solid #21303b",padding:"20px 22px",display:"flex",flexDirection:"column",justifyContent:"space-between"}}>
+            <div className="div-v"/>
+
+            {/* Right — Problem */}
+            <div style={{flex:1,paddingLeft:"1.2rem",display:"flex",flexDirection:"column",justifyContent:"space-between"}}>
               <div>
-                <div className="lr-mono" style={{fontSize:10,letterSpacing:3,color:"#c89456",textTransform:"uppercase",marginBottom:15,display:"flex",alignItems:"center",gap:9}}>
-                  <span style={{width:6,height:6,background:"#c89456",transform:"rotate(45deg)",display:"inline-block",flex:"none"}}/>
-                  Reported Problem
+                <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:10}}>
+                  <IcCircle type="problem"/>
+                  <span className="lbl lr-mono" style={{margin:0}}>Reported problem</span>
                 </div>
-                <div style={{fontSize:26,fontWeight:800,color:"#eef3f7",letterSpacing:".3px"}}>{d.problem?.title || "Unknown"}</div>
-                <div style={{fontSize:13,color:"#aebfcc",marginTop:7,lineHeight:1.4}}>{d.problem?.detail || ""}</div>
+                <div style={{fontSize:22,fontWeight:800,color:tc.title,lineHeight:1,marginBottom:5}}>{d.problem?.title||"Unknown"}</div>
+                <div style={{fontSize:11,color:"#aebfcc",lineHeight:1.4}}>{d.problem?.detail||""}</div>
               </div>
-              <div style={{display:"flex",justifyContent:"center",padding:"14px 0 8px"}}>
-                <ProblemIllustration title={d.problem?.title} />
+              <div style={{display:"flex",justifyContent:"center",padding:"10px 0 6px"}}>
+                <ProblemIllustration title={d.problem?.title}/>
               </div>
-              <div style={{textAlign:"center",fontSize:13.5,color:"#aebfcc",marginTop:6}}>
-                In her words: <q>{d.problem?.quote || ""}</q>
+              <div style={{textAlign:"center",fontSize:11,color:"#aebfcc",padding:"5px 8px",background:"#1d2836",border:"1px solid #21303b",borderRadius:3}}>
+                <span style={{color:"#56697b"}}>In their words: </span>
+                <span style={{color:"#e6b074"}}>"{d.problem?.quote||""}"</span>
               </div>
             </div>
           </div>
 
           {/* FOOTER */}
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:24,paddingTop:18,borderTop:"1px solid #21303b"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:20,paddingTop:16,borderTop:"1px solid #21303b"}}>
             <div className="lr-stamp">
-              <span style={{color:"#5cb083",fontSize:13}}>✓</span>
-              <span className="lr-mono" style={{fontSize:10,letterSpacing:2,color:"#5cb083",textTransform:"uppercase",fontWeight:700}}>Reviewed · Approved for delivery</span>
+              <span style={{color:"#5cb083",fontSize:12}}>✓</span>
+              <span className="lr-mono" style={{fontSize:9,letterSpacing:2,color:"#5cb083",textTransform:"uppercase",fontWeight:700}}>Reviewed · Approved for delivery</span>
             </div>
-            <div className="lr-mono" style={{textAlign:"right",fontSize:9.5,letterSpacing:"1.5px",color:"#7c8e9c",textTransform:"uppercase",lineHeight:1.8}}>
+            <div className="lr-mono" style={{textAlign:"right",fontSize:9,letterSpacing:"1.5px",color:"#7c8e9c",textTransform:"uppercase",lineHeight:1.8}}>
               <div>Call intelligence by <b style={{color:"#c89456"}}>Lead Rescue</b></div>
               <div>Generated · {fmtNow()}</div>
             </div>
