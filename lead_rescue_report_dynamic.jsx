@@ -295,7 +295,10 @@ useEffect(() => {
   .then(r => r.json())
   .then(rows => {
     if (rows && rows.length > 0) {
+      console.log("GOT DATA:", JSON.stringify(rows[0].report_json));
       setLiveData(rows[0].report_json);
+    } else {
+      console.log("NO ROWS:", JSON.stringify(rows));
     }
     setLoading(false);
   })
