@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 
 const SAMPLE = {
   lead: {
@@ -273,7 +273,8 @@ export default function LeadRescueReport() {
   const [data, setData] = useState(SAMPLE);
   const [error, setError] = useState("");
   const [showInput, setShowInput] = useState(false);
-
+const [loading, setLoading] = useState(true);
+const [liveData, setLiveData] = useState(null);
   function handleGenerate() {
     try {
       const parsed = JSON.parse(jsonInput);
@@ -284,8 +285,25 @@ export default function LeadRescueReport() {
       setError("Invalid JSON — check the format and try again.");
     }
   }
+useEffect(() => {
+  fetch(`https://xofgjzfofmjziycqprhq.supabase.co/rest/v1/calls?select=*&order=created_at.desc&limit=1`, {
+    headers: {
+      apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvZmdqemZvZm1qeml5Y3FwcmhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NDI1MDcsImV4cCI6MjA5NzMxODUwN30.qdn-YSphrwgMee0vdpPgE1RudBw0Z-zKOBPXmnZ4aY8",
+      Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvZmdqemZvZm1qeml5Y3FwcmhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NDI1MDcsImV4cCI6MjA5NzMxODUwN30.qdn-YSphrwgMee0vdpPgE1RudBw0Z-zKOBPXmnZ4aY8`
+    }
+  })
+  .then(r => r.json())
+  .then(rows => {
+    if (rows && rows.length > 0) {
+      setLiveData(rows[0].report_json);
+    }
+    setLoading(false);
+  })
+  .catch(() => setLoading(false));
+}, []);
 
-  const d = data;
+const d = liveData || data;
+  
   const tier = d.priority?.tier || "Standard";
   const tc = TIER_COLORS[tier] || TIER_COLORS.Standard;
   const days = d.callback?.days || [];
@@ -300,6 +318,7 @@ export default function LeadRescueReport() {
         <button className="gen-btn" onClick={()=>setShowInput(v=>!v)}>
           {showInput ? "▲ Hide Input" : "▼ Paste JSON"}
         </button>
+        if (loading) return <div style={{color:"#c89456",fontFamily:"monospace",padding:"40px",textAlign:"center"}}>Loading latest call...</div>;
         {showInput && (
           <span style={{fontFamily:"monospace",fontSize:11,color:"#56697b",letterSpacing:"1px"}}>
             PASTE OUTPUT FROM EXTRACTION PROMPT · HIT GENERATE
