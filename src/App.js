@@ -45,7 +45,7 @@ function isDayActive(dayKey, days) {
     if (ld === "today" || ld === "anytime") return true;
     if (ld === "weekdays" && ["mon","tue","wed","thu","fri"].includes(lk)) return true;
     if (ld === "weekend" && ["sat","sun"].includes(lk)) return true;
-    return ld.startsWith(lk.slice(0,2)) || lk.startsWith(ld.slice(0,2));
+    return ld === lk || ld.startsWith(lk) || lk.startsWith(ld);
   });
 }
 
