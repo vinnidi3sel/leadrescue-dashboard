@@ -139,8 +139,8 @@ function ProblemIllustration({ imageUrl }) {
             width:"100%",
             height:"auto",
             display:"block",
-            maxHeight:220,
-            objectFit:"cover"
+            maxHeight:160,
+            objectFit:"contain"
           }}
         />
       </div>
