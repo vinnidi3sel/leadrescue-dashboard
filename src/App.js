@@ -461,7 +461,9 @@ export default function App() {
   const rptNum = React.useRef(Math.floor(Math.random()*9000)+1000).current;
 
   useEffect(() => {
-    fetch(`https://xofgjzfofmjziycqprhq.supabase.co/rest/v1/calls?select=*&order=created_at.desc&limit=50`, {
+    const params = new URLSearchParams(window.location.search);
+    const clientId = params.get("client") || "demo-client";
+    fetch(`https://xofgjzfofmjziycqprhq.supabase.co/rest/v1/calls?select=*&client_id=eq.${clientId}&order=created_at.desc&limit=50`, {
       headers: {
         apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvZmdqemZvZm1qeml5Y3FwcmhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NDI1MDcsImV4cCI6MjA5NzMxODUwN30.qdn-YSphrwgMee0vdpPgE1RudBw0Z-zKOBPXmnZ4aY8",
         Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvZmdqemZvZm1qeml5Y3FwcmhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NDI1MDcsImV4cCI6MjA5NzMxODUwN30.qdn-YSphrwgMee0vdpPgE1RudBw0Z-zKOBPXmnZ4aY8`
