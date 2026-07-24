@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { isDayActive, hexToRgb, fmtTime, fmtDateGroup, parseRecap } from "./utils";
 
 const SAMPLE_CALLS = [
   {
@@ -31,48 +32,8 @@ const TIER_COLORS = {
 
 const TIER_DOT_COLORS = { Emergency:"#dc5b4e", Urgent:"#e2884a", Standard:"#378add", Quote:"#4a7a65" };
 
-function isDayActive(dayKey, days) {
-  if (!days || days.length === 0) return false;
-  const lk = dayKey.toLowerCase();
-  return days.some(d => {
-    const ld = d.toLowerCase();
-    if (ld === "today" || ld === "anytime") return true;
-    if (ld === "weekdays" && ["mon","tue","wed","thu","fri"].includes(lk)) return true;
-    if (ld === "weekend" && ["sat","sun"].includes(lk)) return true;
-    return ld === lk || ld.startsWith(lk) || lk.startsWith(ld);
-  });
-}
-
-function hexToRgb(hex) {
-  const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return r ? `${parseInt(r[1],16)},${parseInt(r[2],16)},${parseInt(r[3],16)}` : "128,128,128";
-}
-
-function fmtTime(iso) {
-  const d = new Date(iso);
-  return d.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
-}
-
-function fmtDateGroup(iso) {
-  const d = new Date(iso);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate()-1);
-  if (d.toDateString() === today.toDateString()) return "Today";
-  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
-  return d.toLocaleDateString([],{weekday:"short",month:"short",day:"numeric"});
-}
-
 function RecapHtml({ html }) {
-  const parts = [];
-  const re = /<q>(.*?)<\/q>/g;
-  let m, last = 0;
-  while ((m = re.exec(html)) !== null) {
-    if (m.index > last) parts.push({ type:"text", val: html.slice(last, m.index) });
-    parts.push({ type:"q", val: m[1] });
-    last = m.index + m[0].length;
-  }
-  if (last < html.length) parts.push({ type:"text", val: html.slice(last) });
+  const parts = parseRecap(html);
   return (
     <p style={{fontSize:"clamp(9px,2.5vw,10.5px)",lineHeight:1.65,color:"#aebfcc",margin:0}}>
       {parts.map((p,i) => p.type === "q"
@@ -471,7 +432,8 @@ export default function App() {
     })
     .then(r => r.json())
     .then(rows => {
-      if (rows && rows.length > 0) { setCalls(rows); setSelected(rows[0]); }
+      // Non-array responses (e.g. a Supabase error object) fall back to sample data
+      if (Array.isArray(rows) && rows.length > 0) { setCalls(rows); setSelected(rows[0]); }
       else { setCalls(SAMPLE_CALLS); setSelected(SAMPLE_CALLS[0]); }
       setLoading(false);
     })
