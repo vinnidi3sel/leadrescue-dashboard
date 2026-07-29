@@ -115,14 +115,51 @@ function Icon({ name, className, style }) {
   );
 }
 
+// Brand lockup ported from the marketing site's <header class="head"> in
+// leadrescue-pages/index.html — the current version (founding-client-setup.html
+// carries an older 100x116 copy with no glow and no tip dot).
+// The blurred duplicate paths ARE the glow: iOS Safari ignores CSS filter on
+// SVG children, so the blur is an SVG feGaussianBlur and only opacity animates.
+// Each glow sits directly under its own path — the shield's fill would hide
+// the wave's otherwise.
+function BrandLockup({ uid, w=30, h=35 }) {
+  const blur = `lr-logo-blur-${uid}`;            // unique per instance: both navs mount at once
+  const SHIELD = "M60 8 L104 24 V64 C104 96 86 120 60 132 C34 120 16 96 16 64 V24 Z";
+  const WAVE = "M26 70 H44 L51 70 L57 52 L66 88 L73 62 L78 70 H94";
+  return (
+    <div className="lr-brand">
+      <svg className="lr-brand-logo" width={w} height={h} viewBox="0 0 120 140" fill="none" aria-hidden="true">
+        <defs>
+          <filter id={blur} x="-75%" y="-75%" width="250%" height="250%">
+            <feGaussianBlur stdDeviation="4"/>
+          </filter>
+        </defs>
+        <path className="bl-glow" d={SHIELD} fill="none" stroke="#5aa3e8" strokeWidth="5" strokeLinejoin="round" filter={`url(#${blur})`}/>
+        <path d={SHIELD} fill="#10161f" stroke="#378add" strokeWidth="2.5" strokeLinejoin="round"/>
+        <path className="bl-glow" d={WAVE} fill="none" stroke="#e6b074" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" filter={`url(#${blur})`}/>
+        <circle className="bl-glow" cx="94" cy="70" r="5" fill="#e6b074" filter={`url(#${blur})`}/>
+        <path d={WAVE} fill="none" stroke="#c89456" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
+        <circle cx="94" cy="70" r="3.5" fill="#dcab6e"/>
+      </svg>
+      <div>
+        <div className="lr-wordmark lr-serif">Lead Rescue</div>
+        <div className="lr-brand-sub lr-mono">Never miss another call</div>
+      </div>
+    </div>
+  );
+}
+
+// Same colourway as BrandLockup above (blue shield, amber waveform, amber tip)
+// so the two marks read as one brand on screen. Geometry stays on this 46x46
+// grid — only the palette is aligned; no glow, the report is a static document.
 function ShieldLogo({ size=38 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 46 46" fill="none">
       <path d="M23 4 L39.5 10 L39.5 22.5 C39.5 31.5 32 38.5 23 42 C14 38.5 6.5 31.5 6.5 22.5 L6.5 10 Z"
-        stroke="#c89456" strokeWidth="1.7" fill="rgba(200,148,86,0.06)" strokeLinejoin="round"/>
+        stroke="#378add" strokeWidth="1.7" fill="#10161f" strokeLinejoin="round"/>
       <path d="M11 24 H18 L20 24 L21.6 16.5 L24 31.5 L26.4 21 L28 24 H35"
-        stroke="#e6b074" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-      <circle cx="35" cy="24" r="1.6" fill="#e6b074"/>
+        stroke="#c89456" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      <circle cx="35" cy="24" r="1.6" fill="#dcab6e"/>
     </svg>
   );
 }
@@ -200,6 +237,21 @@ const css = `
   .lr-serif{font-family:'Liberation Serif','DejaVu Serif',Georgia,serif}
   .lr-nav{background:#101921;border-bottom:1px solid #2b3a47;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
   .lr-nav-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid #5cb083;background:rgba(92,176,131,.1);border-radius:2px}
+  /* ── brand lockup (nav only — the Report keeps its own ShieldLogo) ── */
+  .lr-brand{display:flex;align-items:center;gap:13px}
+  .lr-brand-logo{overflow:visible;flex-shrink:0}
+  .lr-wordmark{font-size:22px;font-weight:600;line-height:1;letter-spacing:.14em;text-transform:uppercase;color:#eef3f7;white-space:nowrap}
+  .lr-brand-sub{font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:#c89456;margin-top:5px;white-space:nowrap}
+  .lr-live-dot{width:6px;height:6px;border-radius:50%;background:#5cb083;display:inline-block;box-shadow:0 0 6px #5cb083}
+  @media(prefers-reduced-motion:no-preference){
+    .lr-brand-logo .bl-glow{animation:lr-logo-glow 2.4s cubic-bezier(.65,0,.35,1) infinite}
+    .lr-live-dot{animation:lr-live-pulse 2s ease-in-out infinite}
+  }
+  @keyframes lr-logo-glow{0%,100%{opacity:.2}50%{opacity:1}}
+  @keyframes lr-live-pulse{
+    0%,100%{transform:scale(1);opacity:.72;box-shadow:0 0 4px rgba(92,176,131,.45)}
+    50%{transform:scale(1.18);opacity:1;box-shadow:0 0 10px rgba(92,176,131,.95),0 0 0 3px rgba(92,176,131,.12)}
+  }
   .lr-log{padding:12px 16px;border-bottom:1px solid #21303b;background:#0d141b}
   .lr-log-label{font-size:8px;letter-spacing:2px;color:#56697b;text-transform:uppercase;margin-bottom:8px}
   .lr-log-group-label{font-size:8px;letter-spacing:1.5px;color:#56697b;text-transform:uppercase;margin-bottom:5px;margin-top:8px}
@@ -710,11 +762,7 @@ export default function App() {
   const sidebar = (
     <>
       <div className="lr-sidebar-nav">
-        <ShieldLogo size={30}/>
-        <div>
-          <div className="lr-serif" style={{fontSize:15,fontWeight:700,letterSpacing:2,color:"#eef3f7",lineHeight:1}}>LEAD RESCUE</div>
-          <div className="lr-mono" style={{fontSize:7,letterSpacing:"3px",color:"#c89456",textTransform:"uppercase",marginTop:2}}>Never miss another call</div>
-        </div>
+        <BrandLockup uid="sidebar"/>
       </div>
       <CallLog calls={calls} selectedId={selected?.id} onSelect={c=>{setSelected(c);window.scrollTo&&window.scrollTo({top:0,behavior:"smooth"})}}/>
     </>
@@ -723,15 +771,9 @@ export default function App() {
   const main = (
     <>
       <nav className="lr-nav">
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <ShieldLogo size={26}/>
-          <div>
-            <div className="lr-serif" style={{fontSize:15,fontWeight:700,letterSpacing:2,color:"#eef3f7",lineHeight:1}}>LEAD RESCUE</div>
-            <div className="lr-mono" style={{fontSize:7,letterSpacing:"3px",color:"#c89456",textTransform:"uppercase",marginTop:2}}>Never miss another call</div>
-          </div>
-        </div>
+        <BrandLockup uid="nav" w={26} h={30}/>
         <div className="lr-nav-badge">
-          <span style={{width:6,height:6,borderRadius:"50%",background:"#5cb083",boxShadow:"0 0 6px #5cb083",display:"inline-block"}}/>
+          <span className="lr-live-dot"/>
           <span className="lr-mono" style={{fontSize:9,letterSpacing:1.5,color:"#5cb083",textTransform:"uppercase",fontWeight:700}}>Live</span>
         </div>
       </nav>
