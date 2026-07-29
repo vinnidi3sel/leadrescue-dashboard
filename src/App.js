@@ -232,6 +232,9 @@ function fmtRecv(iso) {
 
 const css = `
   *{box-sizing:border-box}
+  /* the app container alone left white showing through on overscroll and
+     anywhere the container did not reach */
+  html,body{background:#0b1014;margin:0}
   .lr-app{background:#0b1014;min-height:100vh;font-family:'Liberation Sans','DejaVu Sans',Arial,sans-serif}
   .lr-mono{font-family:'DejaVu Sans Mono','Liberation Mono',monospace}
   .lr-serif{font-family:'Liberation Serif','DejaVu Serif',Georgia,serif}
@@ -269,7 +272,13 @@ const css = `
   .lr-log-name{font-size:11px;color:#eef3f7;font-weight:500;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .lr-log-problem{font-size:10px;color:#aebfcc;flex:1.2;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .lr-log-time{font-size:9px;color:#56697b;flex-shrink:0}
+  /* Inert on desktop: display:contents keeps the sidebar row a single flex
+     line of dot / name / problem / time / chevron, exactly as before. */
+  .lr-log-main{display:contents}
+  .lr-log-lbl{display:none}
+  .lr-log-pri{display:none}
   .lr-log-tier{display:none}
+  .lr-log-reason{display:none}
   .lr-log-chevron{font-size:10px;color:#56697b;flex-shrink:0}
   .lr-empty-title{font-size:15px;color:#eef3f7;font-weight:600;margin-bottom:6px}
   .lr-empty-body{font-size:12px;color:#82a0ba;line-height:1.5;max-width:340px}
@@ -316,7 +325,8 @@ const css = `
   .rpt-quote{font-size:clamp(8px,2vw,9px)}
   /* Hero spacing lifted out of the inline style, verbatim, so the mobile block
      can collapse it. */
-  .rpt-hero{padding-bottom:12px;border-bottom:1px solid #21303b;margin-bottom:12px}
+  .rpt-hero{display:flex;padding-bottom:12px;border-bottom:1px solid #21303b;margin-bottom:12px}
+  .rpt-footer{display:flex}
   /* display lives here, not inline, so the mobile block can hide these at all —
      an inline display beats a class rule. Values match the originals. */
   .rpt-header{display:flex}
@@ -385,7 +395,7 @@ const css = `
     .lr-tools{display:none}
     .lr-log{padding:12px;border-bottom:none}
     .lr-mobile-state{padding:0 12px 16px}
-    .lr-inline-report{margin-bottom:10px}
+    .lr-inline-report{margin:8px 0 12px}
     /* clears the sticky .lr-nav when a row is scrolled to the top */
     /* Trimmed report header. The brand lockup is already in the nav, and the
        eyebrow / subtitle / RECOVERED badge restate what the page says anyway.
@@ -395,7 +405,15 @@ const css = `
     .rpt-eyebrow{display:none}
     .rpt-submeta{display:none}
     .rpt-recovered{display:none}
-    .rpt-hero{padding-bottom:0;border-bottom:none;margin-bottom:10px}
+    /* The outer report card is scaffolding on a phone: its "Lead rescued."
+       heading, border, grid backdrop, crop marks and padding all go, and the
+       .box sections inside become the full-width cards. */
+    .rpt-hero{display:none}
+    .rpt-footer{display:none}
+    .lr-card{border:none;background:none;border-radius:0;margin-top:0}
+    .lr-grid-bg{display:none}
+    .lr-crop{display:none}
+    .lr-pad{padding:0}
     /* float, not flex: the name and descriptor flow around the meta and then
        reclaim full width below it, instead of being pinned into a narrow column */
     .rpt-lead-top{display:block}
@@ -404,7 +422,6 @@ const css = `
     .rpt-lead-meta{display:block;float:right;max-width:48%;margin:0 0 4px 12px;
       text-align:right;line-height:1.7;color:#56697b;text-transform:uppercase;letter-spacing:.5px}
 
-    .lr-log-item{scroll-margin-top:56px}
     .lr-log-item.open{border-color:#c89456;background:rgba(200,148,86,.06)}
     .lr-log-item.open .lr-log-chevron{transform:translateY(-50%) rotate(90deg)}
 
@@ -413,13 +430,24 @@ const css = `
     .lr-log-group-label{font-size:10px}
     .lr-log-caret{font-size:9px}
     .lr-log-count{font-size:10px}
-    .lr-log-item{display:block;position:relative;padding:12px 28px 12px 14px;margin-bottom:6px}
+    .lr-log-item{display:flex;align-items:center;gap:10px;position:relative;
+      padding:11px 26px 11px 14px;margin-bottom:6px}
+    .lr-log-main{display:block;flex:1;min-width:0}
+    .lr-log-lbl{display:block;font-size:9px;letter-spacing:1px;color:#56697b;
+      text-transform:uppercase;line-height:1;margin-bottom:3px}
+    /* priority: right side, vertically centred, tier-coloured, reason clipped
+       to one line so the row stays scannable rather than becoming a paragraph */
+    .lr-log-pri{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;
+      flex-shrink:0;max-width:42%;margin-left:4px;text-align:right}
+    .lr-log-tier{display:block;font-size:13px;font-weight:700;letter-spacing:1px;
+      text-transform:uppercase;line-height:1.1}
+    .lr-log-reason{display:block;max-width:100%;margin-top:4px;font-size:11px;color:#82a0ba;
+      line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .lr-log-item::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:2px 0 0 2px;background:var(--tier,#82a0ba)}
     .lr-log-dot{display:none}
-    .lr-log-name{display:block;font-size:15px;font-weight:600;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.25;margin-bottom:3px}
-    .lr-log-problem{display:block;font-size:13px;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.35;margin-bottom:7px}
-    .lr-log-time{display:inline-block;vertical-align:middle;font-size:11px}
-    .lr-log-tier{display:inline-block;vertical-align:middle;margin-left:8px;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;padding:2px 6px;border:1px solid;border-radius:2px}
+    .lr-log-name{display:block;font-size:15px;font-weight:600;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.25;margin-bottom:8px}
+    .lr-log-problem{display:block;font-size:13px;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.35;margin-bottom:8px}
+    .lr-log-time{display:block;font-size:11px;line-height:1.2}
     .lr-log-chevron{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:15px;transition:transform .18s ease}
   }
   .gen-btn{background:rgba(200,148,86,.12);border:1px solid #c89456;color:#e6b074;font-family:monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:6px 14px;border-radius:2px;cursor:pointer}
@@ -434,15 +462,26 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick }) {
   const tier = call.report_json?.priority?.tier || "Standard";
   const dot = TIER_DOT_COLORS[tier] || "#82a0ba";
   const problem = call.report_json?.problem?.title || "Unknown";
+  const reason = call.report_json?.priority?.reason || "";
   return (
     <div id={rowId} className={`lr-log-item${isActive?" active":""}${expanded?" open":""}`}
       style={{"--tier":dot}} onClick={onClick}
       role={rowId?"button":undefined} aria-expanded={rowId?!!expanded:undefined}>
       <span className="lr-log-dot" style={{background:dot,boxShadow:isActive?`0 0 5px ${dot}`:undefined}}/>
-      <span className="lr-log-name lr-mono">{call.caller_name||"Unknown"}</span>
-      <span className="lr-log-problem">{problem}</span>
-      <span className="lr-log-time lr-mono">{fmtTime(call.created_at)}</span>
-      <span className="lr-log-tier lr-mono" style={{color:dot,borderColor:dot}}>{tier}</span>
+      {/* display:contents on desktop, so the sidebar row stays the same flex line */}
+      <div className="lr-log-main">
+        <span className="lr-log-lbl lr-mono">Caller</span>
+        <span className="lr-log-name lr-mono">{call.caller_name||"Unknown"}</span>
+        <span className="lr-log-lbl lr-mono">Reason for call</span>
+        <span className="lr-log-problem">{problem}</span>
+        <span className="lr-log-lbl lr-mono">Received</span>
+        <span className="lr-log-time lr-mono">{fmtTime(call.created_at)}</span>
+      </div>
+      {/* mobile only — priority pulled out to the right of the row */}
+      <div className="lr-log-pri">
+        <span className="lr-log-tier lr-mono" style={{color:dot}}>{tier}</span>
+        {reason && <span className="lr-log-reason">{reason}</span>}
+      </div>
       <span className="lr-log-chevron">›</span>
     </div>
   );
@@ -574,7 +613,7 @@ function Report({ call, rptNum }) {
         </div>
 
         {/* HERO */}
-        <div className="rpt-hero" style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div className="rpt-hero" style={{alignItems:"center",justifyContent:"space-between"}}>
           <div>
             <div className="rpt-eyebrow lr-mono fs-7" style={{letterSpacing:"3px",color:"#c89456",textTransform:"uppercase",marginBottom:4}}>Call Intelligence — Dispatch Report</div>
             <div className="lr-serif" style={{fontStyle:"italic",fontSize:"clamp(22px,6vw,30px)",lineHeight:.95,color:"#eef3f7"}}>
@@ -715,7 +754,7 @@ function Report({ call, rptNum }) {
         </div>
 
         {/* FOOTER */}
-        <div className="rpt-footer" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:12,paddingTop:10,borderTop:"1px solid #21303b"}}>
+        <div className="rpt-footer" style={{justifyContent:"space-between",alignItems:"center",marginTop:12,paddingTop:10,borderTop:"1px solid #21303b"}}>
           <div style={{display:"inline-flex",alignItems:"center",gap:4,border:"1px solid rgba(92,176,131,.35)",padding:"2px 8px",borderRadius:2,transform:"rotate(-1.5deg)"}}>
             <span className="fs-8" style={{color:"#5cb083"}}>✓</span>
             <span className="lr-mono fs-7" style={{letterSpacing:"1.5px",color:"#5cb083",textTransform:"uppercase",fontWeight:700,whiteSpace:"nowrap"}}>Reviewed · Approved for delivery</span>
@@ -757,10 +796,24 @@ export default function App() {
     const id = scrollTargetId.current;
     if (id === null) return;
     scrollTargetId.current = null;
-    const el = document.getElementById(`lr-row-${id}`);
-    if (el && el.scrollIntoView) {
-      requestAnimationFrame(() => el.scrollIntoView({behavior:"smooth", block:"start"}));
-    }
+    const row = document.getElementById(`lr-row-${id}`);
+    if (!row) return;
+    requestAnimationFrame(() => {
+      const NAV = 56;                                   // sticky .lr-nav height
+      const group = row.closest(".lr-log-group");
+      // Whatever sits above this row must stay on screen: its day header, or the
+      // "N rescued calls" line when this is the first group (it sits right above).
+      const prev = group && group.previousElementSibling;
+      const anchor = prev && prev.classList.contains("lr-log-label")
+        ? prev
+        : group && group.querySelector(".lr-log-group-hdr");
+      const y = window.scrollY !== undefined ? window.scrollY : window.pageYOffset;
+      const rowTop = y + row.getBoundingClientRect().top - NAV;
+      // Scroll far enough to bring the report up, but never past the anchor —
+      // so the day header and its count stay visible instead of being pushed off.
+      const limit = anchor ? y + anchor.getBoundingClientRect().top - NAV : rowTop;
+      window.scrollTo({top: Math.max(0, Math.min(rowTop, limit)), behavior:"smooth"});
+    });
   }, [mobileOpenId]);
 
   useEffect(() => {
