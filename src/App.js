@@ -314,6 +314,19 @@ const css = `
   .rpt-body{font-size:clamp(8px,2.2vw,9.5px)}
   .rpt-note{font-size:clamp(8px,2.2vw,9px)}
   .rpt-quote{font-size:clamp(8px,2vw,9px)}
+  /* Hero spacing lifted out of the inline style, verbatim, so the mobile block
+     can collapse it. */
+  .rpt-hero{padding-bottom:12px;border-bottom:1px solid #21303b;margin-bottom:12px}
+  /* display lives here, not inline, so the mobile block can hide these at all —
+     an inline display beats a class rule. Values match the originals. */
+  .rpt-header{display:flex}
+  .rpt-recovered{display:inline-flex}
+  /* Caller-block wrappers are inert on desktop: display:contents makes the
+     pill, name and descriptor behave as direct children of .box exactly as
+     they did before, and the case/received meta only exists on mobile. */
+  .rpt-lead-top{display:contents}
+  .rpt-lead-head{display:contents}
+  .rpt-lead-meta{display:none}
   @media(min-width:768px){
     .lr-layout{display:grid;grid-template-columns:300px 1fr;min-height:100vh}
     .lr-sidebar{border-right:1px solid #21303b;background:#0d141b;overflow-y:auto;height:100vh;position:sticky;top:0}
@@ -374,6 +387,23 @@ const css = `
     .lr-mobile-state{padding:0 12px 16px}
     .lr-inline-report{margin-bottom:10px}
     /* clears the sticky .lr-nav when a row is scrolled to the top */
+    /* Trimmed report header. The brand lockup is already in the nav, and the
+       eyebrow / subtitle / RECOVERED badge restate what the page says anyway.
+       Case + received move into the caller block, so the whole header row goes
+       — border included, leaving no gap where it was. */
+    .rpt-header{display:none}
+    .rpt-eyebrow{display:none}
+    .rpt-submeta{display:none}
+    .rpt-recovered{display:none}
+    .rpt-hero{padding-bottom:0;border-bottom:none;margin-bottom:10px}
+    /* float, not flex: the name and descriptor flow around the meta and then
+       reclaim full width below it, instead of being pinned into a narrow column */
+    .rpt-lead-top{display:block}
+    .rpt-lead-top::after{content:"";display:block;clear:both}
+    .rpt-lead-head{display:block}
+    .rpt-lead-meta{display:block;float:right;max-width:48%;margin:0 0 4px 12px;
+      text-align:right;line-height:1.7;color:#56697b;text-transform:uppercase;letter-spacing:.5px}
+
     .lr-log-item{scroll-margin-top:56px}
     .lr-log-item.open{border-color:#c89456;background:rgba(200,148,86,.06)}
     .lr-log-item.open .lr-log-chevron{transform:translateY(-50%) rotate(90deg)}
@@ -528,7 +558,7 @@ function Report({ call, rptNum }) {
       <div className="lr-pad">
 
         {/* HEADER */}
-        <div className="rpt-header" style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",paddingBottom:12,borderBottom:"1px solid #21303b",marginBottom:12}}>
+        <div className="rpt-header" style={{justifyContent:"space-between",alignItems:"flex-start",paddingBottom:12,borderBottom:"1px solid #21303b",marginBottom:12}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <ShieldLogo size={32}/>
             <div>
@@ -544,15 +574,15 @@ function Report({ call, rptNum }) {
         </div>
 
         {/* HERO */}
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingBottom:12,borderBottom:"1px solid #21303b",marginBottom:12}}>
+        <div className="rpt-hero" style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <div>
-            <div className="lr-mono fs-7" style={{letterSpacing:"3px",color:"#c89456",textTransform:"uppercase",marginBottom:4}}>Call Intelligence — Dispatch Report</div>
+            <div className="rpt-eyebrow lr-mono fs-7" style={{letterSpacing:"3px",color:"#c89456",textTransform:"uppercase",marginBottom:4}}>Call Intelligence — Dispatch Report</div>
             <div className="lr-serif" style={{fontStyle:"italic",fontSize:"clamp(22px,6vw,30px)",lineHeight:.95,color:"#eef3f7"}}>
               Lead <span style={{color:"#e6b074"}}>rescued.</span>
             </div>
-            <div className="lr-mono fs-75" style={{letterSpacing:"1.5px",color:"#56697b",textTransform:"uppercase",marginTop:6}}>Missed on the main line · caught by Voice AI</div>
+            <div className="rpt-submeta lr-mono fs-75" style={{letterSpacing:"1.5px",color:"#56697b",textTransform:"uppercase",marginTop:6}}>Missed on the main line · caught by Voice AI</div>
           </div>
-          <div style={{display:"inline-flex",alignItems:"center",gap:6,padding:"6px 10px",border:"1px solid #5cb083",background:"rgba(92,176,131,.1)",borderRadius:2,flexShrink:0,marginLeft:8}}>
+          <div className="rpt-recovered" style={{alignItems:"center",gap:6,padding:"6px 10px",border:"1px solid #5cb083",background:"rgba(92,176,131,.1)",borderRadius:2,flexShrink:0,marginLeft:8}}>
             <span style={{width:6,height:6,borderRadius:"50%",background:"#5cb083",boxShadow:"0 0 6px #5cb083",display:"inline-block"}}/>
             <span className="lr-mono fs-9" style={{letterSpacing:2,color:"#5cb083",textTransform:"uppercase",fontWeight:700}}>Recovered</span>
           </div>
@@ -563,12 +593,22 @@ function Report({ call, rptNum }) {
 
           {/* LEFT BOX */}
           <div className="box" style={{borderLeft:"3px solid #c89456",marginBottom:0}}>
-            <div style={{display:"inline-flex",alignItems:"center",gap:5,padding:"2px 8px",border:"1px solid #c89456",background:"rgba(200,148,86,.1)",borderRadius:2,marginBottom:6}}>
-              <span style={{width:4,height:4,borderRadius:"50%",background:"#e6b074",display:"inline-block"}}/>
-              <span className="lr-mono fs-75" style={{letterSpacing:2,color:"#e6b074",textTransform:"uppercase",fontWeight:700}}>New Lead</span>
+            <div className="rpt-lead-top">
+              {/* mobile only — mirrors the header meta the mobile view drops.
+                  Comes first so the name/descriptor flow around the float. */}
+              <div className="rpt-lead-meta lr-mono fs-8">
+                <div>Case <span style={{color:"#aebfcc"}}>#{rptNum}</span></div>
+                <div>Recv <span style={{color:"#aebfcc"}}>{fmtRecv(call.created_at)}</span></div>
+              </div>
+              <div className="rpt-lead-head">
+                <div style={{display:"inline-flex",alignItems:"center",gap:5,padding:"2px 8px",border:"1px solid #c89456",background:"rgba(200,148,86,.1)",borderRadius:2,marginBottom:6}}>
+                  <span style={{width:4,height:4,borderRadius:"50%",background:"#e6b074",display:"inline-block"}}/>
+                  <span className="lr-mono fs-75" style={{letterSpacing:2,color:"#e6b074",textTransform:"uppercase",fontWeight:700}}>New Lead</span>
+                </div>
+                <div className="lr-serif" style={{fontStyle:"italic",fontSize:"clamp(18px,5vw,24px)",color:"#eef3f7",lineHeight:1,marginBottom:2}}>{d.lead?.name||"Unknown"}</div>
+                <div className="lr-mono fs-75" style={{letterSpacing:"1.5px",color:"#56697b",textTransform:"uppercase",marginBottom:6}}>{d.lead?.descriptor||""}</div>
+              </div>
             </div>
-            <div className="lr-serif" style={{fontStyle:"italic",fontSize:"clamp(18px,5vw,24px)",color:"#eef3f7",lineHeight:1,marginBottom:2}}>{d.lead?.name||"Unknown"}</div>
-            <div className="lr-mono fs-75" style={{letterSpacing:"1.5px",color:"#56697b",textTransform:"uppercase",marginBottom:6}}>{d.lead?.descriptor||""}</div>
             <div className="div-h"/>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 12px",marginTop:".3rem",marginBottom:".6rem"}}>
               {[
