@@ -74,12 +74,44 @@ function RecapHtml({ html }) {
   }
   if (last < html.length) parts.push({ type:"text", val: html.slice(last) });
   return (
-    <p style={{fontSize:"clamp(9px,2.5vw,10.5px)",lineHeight:1.65,color:"#aebfcc",margin:0}}>
+    <p className="rpt-recap" style={{lineHeight:1.65,color:"#aebfcc",margin:0}}>
       {parts.map((p,i) => p.type === "q"
         ? <strong key={i} style={{color:"#eef3f7",fontWeight:700}}>{p.val}</strong>
         : <span key={i}>{p.val}</span>
       )}
     </p>
+  );
+}
+
+// Tabler Icons (MIT) — the 11 glyphs this report uses, inlined as raw path data.
+// The webfont package costs ~490KB over the wire (plus 127MB in node_modules) for
+// the same 11 icons; this is ~2KB with no request and no third-party origin.
+// Source: @tabler/icons v3, outline set, drawn on a 24x24 grid.
+const ICON_PATHS = {
+  "alert-circle":     ["M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0","M12 8v4","M12 16h.01"],
+  "antenna":          ["M20 4v8","M16 4.5v7","M12 5v16","M8 5.5v5","M4 6v4","M20 8h-16"],
+  "arrow-right":      ["M5 12l14 0","M13 18l6 -6","M13 6l6 6"],
+  "at":               ["M8 12a4 4 0 1 0 8 0a4 4 0 1 0 -8 0","M16 12v1.5a2.5 2.5 0 0 0 5 0v-1.5a9 9 0 1 0 -5.5 8.28"],
+  "clock":            ["M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0","M12 7v5l3 3"],
+  "device-mobile":    ["M6 5a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-14","M11 4h2","M12 17v.01"],
+  "eye":              ["M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0","M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"],
+  "file-description": ["M14 3v4a1 1 0 0 0 1 1h4","M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2","M9 17h6","M9 13h6"],
+  "map-pin":          ["M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0","M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0"],
+  "message-dots":     ["M12 11v.01","M8 11v.01","M16 11v.01","M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3l12 0"],
+  "tool":             ["M7 10h3v-3l-3.5 -3.5a6 6 0 0 1 8 8l6 6a2 2 0 0 1 -3 3l-6 -6a6 6 0 0 1 -8 -8l3.5 3.5"]
+};
+
+// Sized in em and stroked with currentColor, so it keeps inheriting size from the
+// font-size on its class or parent — exactly how the <i> font icons behaved.
+function Icon({ name, className, style }) {
+  const paths = ICON_PATHS[name];
+  if (!paths) return null;
+  return (
+    <svg className={`lr-ico${className?` ${className}`:""}`} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+      style={style} aria-hidden="true" focusable="false">
+      {paths.map((d,i) => <path key={i} d={d}/>)}
+    </svg>
   );
 }
 
@@ -172,6 +204,12 @@ const css = `
   .lr-log-label{font-size:8px;letter-spacing:2px;color:#56697b;text-transform:uppercase;margin-bottom:8px}
   .lr-log-group-label{font-size:8px;letter-spacing:1.5px;color:#56697b;text-transform:uppercase;margin-bottom:5px;margin-top:8px}
   .lr-log-group-label:first-child{margin-top:0}
+  .lr-log-group + .lr-log-group{margin-top:6px}
+  .lr-log-group-hdr{display:flex;align-items:center;gap:7px;width:100%;padding:6px 2px;background:none;border:none;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .lr-log-group-hdr .lr-log-group-label{margin:0}
+  .lr-log-caret{display:inline-block;font-size:7px;color:#56697b;transform:rotate(0deg);transition:transform .18s ease;flex-shrink:0}
+  .lr-log-caret.open{transform:rotate(90deg)}
+  .lr-log-count{margin-left:auto;font-size:8px;letter-spacing:1px;color:#56697b;flex-shrink:0}
   .lr-log-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #21303b;border-radius:3px;background:#141d25;margin-bottom:4px;cursor:pointer;transition:border-color .15s}
   .lr-log-item:hover{border-color:#2b3a47}
   .lr-log-item.active{border-color:#c89456;background:rgba(200,148,86,.06)}
@@ -179,7 +217,10 @@ const css = `
   .lr-log-name{font-size:11px;color:#eef3f7;font-weight:500;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .lr-log-problem{font-size:10px;color:#aebfcc;flex:1.2;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .lr-log-time{font-size:9px;color:#56697b;flex-shrink:0}
+  .lr-log-tier{display:none}
   .lr-log-chevron{font-size:10px;color:#56697b;flex-shrink:0}
+  .lr-empty-title{font-size:15px;color:#eef3f7;font-weight:600;margin-bottom:6px}
+  .lr-empty-body{font-size:12px;color:#82a0ba;line-height:1.5;max-width:340px}
   .lr-report{padding:0 16px 32px}
   .lr-card{position:relative;border:1px solid #2b3a47;overflow:hidden;background:linear-gradient(180deg,#101921 0%,#0d141b 100%);margin-top:12px;border-radius:4px}
   .lr-grid-bg{position:absolute;inset:0;background-image:linear-gradient(rgba(130,160,186,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(130,160,186,.04) 1px,transparent 1px);background-size:42px 42px;pointer-events:none}
@@ -205,6 +246,22 @@ const css = `
   .lr-tier .tdot{width:5px;height:5px;border-radius:50%;flex-shrink:0;background:#21303b}
   .lr-tier .tn{font-size:7.5px;letter-spacing:1.5px;font-weight:700;text-transform:uppercase;color:#56697b}
   .lr-tier .tr{font-size:7.5px;color:#aebfcc}
+  /* Size-only utilities. Each mirrors exactly the inline fontSize it replaced,
+     so desktop is unchanged — but the mobile media query can now reach them.
+     Declared after .sec-title so a "sec-title fs-8" element still lands on 8px. */
+  .fs-7{font-size:7px}
+  .fs-75{font-size:7.5px}
+  .fs-8{font-size:8px}
+  .fs-9{font-size:9px}
+  .field-icon{font-size:10px}
+  .lr-ico{width:1em;height:1em;flex-shrink:0;display:inline-block;vertical-align:-.125em}
+  /* Report body copy. Each clamp is verbatim from the inline style it replaced,
+     so desktop is byte-identical; the mobile block below raises the floors,
+     which a clamp cannot do on its own (a min above the max wins everywhere). */
+  .rpt-recap{font-size:clamp(9px,2.5vw,10.5px)}
+  .rpt-body{font-size:clamp(8px,2.2vw,9.5px)}
+  .rpt-note{font-size:clamp(8px,2.2vw,9px)}
+  .rpt-quote{font-size:clamp(8px,2vw,9px)}
   @media(min-width:768px){
     .lr-layout{display:grid;grid-template-columns:300px 1fr;min-height:100vh}
     .lr-sidebar{border-right:1px solid #21303b;background:#0d141b;overflow-y:auto;height:100vh;position:sticky;top:0}
@@ -224,6 +281,64 @@ const css = `
     .lr-sidebar-nav{display:none}
     .report-grid{display:flex;flex-direction:column;gap:8px}
     .report-right{display:flex;flex-direction:column;gap:8px}
+
+    /* readable type on a phone */
+    .lr-pad{padding:14px}
+    .box{padding:12px}
+    .field-lbl{font-size:10px}
+    .field-val{font-size:15px}
+    .field-val-dim{font-size:14px}
+    .sec-title{font-size:11px}
+    .lr-log-label{font-size:11px}
+    .lr-tier .tn{font-size:10px}
+    .lr-tier .tr{font-size:10px}
+    .lr-day{width:26px;height:26px}
+    .lr-day .dl{font-size:10px}
+    .ai-img-label{font-size:9px}
+    .field-icon{font-size:13px}
+    /* after .sec-title above, so "sec-title fs-8" resolves to 10px not 11px */
+    .fs-7{font-size:9px}
+    .fs-75{font-size:9.5px}
+    .fs-8{font-size:10px}
+    .fs-9{font-size:11px}
+    /* body copy must read larger than the label above it, not smaller */
+    .rpt-recap{font-size:14px}
+    .rpt-body{font-size:14px}
+    .rpt-note{font-size:14px}
+    .rpt-quote{font-size:14px}
+    /* neither the header nor the footer fits as a single row at these sizes:
+       the meta blocks grew enough to squeeze the titles into wrapping */
+    .rpt-footer{flex-wrap:wrap;gap:10px}
+    .rpt-header{flex-wrap:wrap;gap:10px}
+
+    /* ── single-column accordion ──────────────────────────────────────────
+       The sidebar log and the standalone report pane are both desktop-only.
+       On a phone the mobile log IS the page: day groups → call rows → the
+       report expanded inline under whichever row is open. */
+    .lr-sidebar{display:none}
+    .lr-report{display:none}
+    .lr-tools{display:none}
+    .lr-log{padding:12px;border-bottom:none}
+    .lr-mobile-state{padding:0 12px 16px}
+    .lr-inline-report{margin-bottom:10px}
+    /* clears the sticky .lr-nav when a row is scrolled to the top */
+    .lr-log-item{scroll-margin-top:56px}
+    .lr-log-item.open{border-color:#c89456;background:rgba(200,148,86,.06)}
+    .lr-log-item.open .lr-log-chevron{transform:translateY(-50%) rotate(90deg)}
+
+    /* call log as stacked cards */
+    .lr-log-group-hdr{padding:10px 2px}
+    .lr-log-group-label{font-size:10px}
+    .lr-log-caret{font-size:9px}
+    .lr-log-count{font-size:10px}
+    .lr-log-item{display:block;position:relative;padding:12px 28px 12px 14px;margin-bottom:6px}
+    .lr-log-item::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:2px 0 0 2px;background:var(--tier,#82a0ba)}
+    .lr-log-dot{display:none}
+    .lr-log-name{display:block;font-size:15px;font-weight:600;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.25;margin-bottom:3px}
+    .lr-log-problem{display:block;font-size:13px;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.35;margin-bottom:7px}
+    .lr-log-time{display:inline-block;vertical-align:middle;font-size:11px}
+    .lr-log-tier{display:inline-block;vertical-align:middle;margin-left:8px;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;padding:2px 6px;border:1px solid;border-radius:2px}
+    .lr-log-chevron{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:15px;transition:transform .18s ease}
   }
   .gen-btn{background:rgba(200,148,86,.12);border:1px solid #c89456;color:#e6b074;font-family:monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:6px 14px;border-radius:2px;cursor:pointer}
   .gen-btn:hover{background:rgba(200,148,86,.22)}
@@ -233,39 +348,112 @@ const css = `
   .ai-img-label{font-family:'DejaVu Sans Mono',monospace;font-size:7px;letter-spacing:1.5px;color:#4a7a9b;text-transform:uppercase;text-align:center;margin-top:5px;opacity:.7}
 `;
 
-function CallLogItem({ call, isActive, onClick }) {
+function CallLogItem({ call, isActive, expanded, rowId, onClick }) {
   const tier = call.report_json?.priority?.tier || "Standard";
   const dot = TIER_DOT_COLORS[tier] || "#82a0ba";
   const problem = call.report_json?.problem?.title || "Unknown";
   return (
-    <div className={`lr-log-item${isActive?" active":""}`} onClick={onClick}>
+    <div id={rowId} className={`lr-log-item${isActive?" active":""}${expanded?" open":""}`}
+      style={{"--tier":dot}} onClick={onClick}
+      role={rowId?"button":undefined} aria-expanded={rowId?!!expanded:undefined}>
       <span className="lr-log-dot" style={{background:dot,boxShadow:isActive?`0 0 5px ${dot}`:undefined}}/>
       <span className="lr-log-name lr-mono">{call.caller_name||"Unknown"}</span>
       <span className="lr-log-problem">{problem}</span>
       <span className="lr-log-time lr-mono">{fmtTime(call.created_at)}</span>
+      <span className="lr-log-tier lr-mono" style={{color:dot,borderColor:dot}}>{tier}</span>
       <span className="lr-log-chevron">›</span>
     </div>
   );
 }
 
-function CallLog({ calls, selectedId, onSelect }) {
-  const groups = {};
+// Two modes, one component so the grouping and day-collapse logic stays shared:
+//  - default (desktop sidebar): rows select, the report lives in its own pane
+//  - accordion (mobile): rows toggle, the report renders inline under the open row
+function CallLog({ calls, selectedId, onSelect, accordion=false, expandedId=null, onToggle, rptNum }) {
+  // date label -> bool. Absent = use the default (Today open, everything else collapsed).
+  const [openOverrides, setOpenOverrides] = useState({});
+  const currentId = accordion ? expandedId : selectedId;
+
+  const groups = [];
+  const groupIndex = {};
   calls.forEach(c => {
     const g = fmtDateGroup(c.created_at);
-    if (!groups[g]) groups[g] = [];
-    groups[g].push(c);
+    if (groupIndex[g] === undefined) { groupIndex[g] = groups.length; groups.push([g, []]); }
+    groups[groupIndex[g]][1].push(c);
   });
+
   return (
     <div className="lr-log">
       <div className="lr-log-label lr-mono">{calls.length} rescued call{calls.length!==1?"s":""}</div>
-      {Object.entries(groups).map(([date, items]) => (
-        <div key={date}>
-          <div className="lr-log-group-label lr-mono">{date}</div>
-          {items.map(c => (
-            <CallLogItem key={c.id} call={c} isActive={c.id===selectedId} onClick={()=>onSelect(c)}/>
-          ))}
-        </div>
-      ))}
+      {groups.map(([date, items]) => {
+        const hasCurrent = items.some(c => c.id === currentId);
+        const userOpen = openOverrides[date] !== undefined ? openOverrides[date] : date === "Today";
+        // a group holding the current call is always shown, whatever the toggle says
+        const open = hasCurrent || userOpen;
+        return (
+          <div key={date} className="lr-log-group">
+            <button
+              type="button"
+              className="lr-log-group-hdr"
+              aria-expanded={open}
+              onClick={()=>setOpenOverrides(prev => ({...prev, [date]: !open}))}
+            >
+              <span className={`lr-log-caret${open?" open":""}`}>▶</span>
+              <span className="lr-log-group-label lr-mono">{date}</span>
+              <span className="lr-log-count lr-mono">{items.length}</span>
+            </button>
+            {open && items.map(c => {
+              const isCurrent = c.id === currentId;
+              return (
+                <React.Fragment key={c.id}>
+                  <CallLogItem
+                    call={c}
+                    isActive={isCurrent}
+                    expanded={accordion && isCurrent}
+                    // id only in accordion mode — the desktop log renders the same
+                    // calls, and duplicate DOM ids would break the scroll target
+                    rowId={accordion ? `lr-row-${c.id}` : undefined}
+                    onClick={()=> accordion ? onToggle(c) : onSelect(c)}
+                  />
+                  {accordion && isCurrent && (
+                    <div className="lr-inline-report">
+                      <Report call={c} rptNum={rptNum}/>
+                    </div>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="lr-card">
+      <div className="lr-grid-bg"/>
+      <span className="lr-crop tl"/><span className="lr-crop tr"/>
+      <span className="lr-crop bl"/><span className="lr-crop br"/>
+      <div className="lr-pad" style={{display:"flex",flexDirection:"column",alignItems:"center",textAlign:"center",gap:4,padding:"40px 20px"}}>
+        <ShieldLogo size={38}/>
+        <div className="lr-serif lr-empty-title" style={{marginTop:8}}>No calls yet</div>
+        <div className="lr-empty-body">Every rescued call will appear here the moment it comes in.</div>
+      </div>
+    </div>
+  );
+}
+
+function LoadErrorState() {
+  return (
+    <div className="lr-card" style={{borderColor:"rgba(220,91,78,.4)"}}>
+      <div className="lr-grid-bg"/>
+      <div className="lr-pad" style={{display:"flex",flexDirection:"column",alignItems:"center",textAlign:"center",gap:4,padding:"40px 20px"}}>
+        <div className="lr-mono fs-9" style={{letterSpacing:2,color:"#f0a59b",textTransform:"uppercase"}}>Connection error</div>
+        <div className="lr-serif lr-empty-title" style={{marginTop:6}}>Couldn't load your calls</div>
+        <div className="lr-empty-body">We couldn't reach the call log just now. Check your connection and refresh — nothing has been lost.</div>
+      </div>
     </div>
   );
 }
@@ -288,15 +476,15 @@ function Report({ call, rptNum }) {
       <div className="lr-pad">
 
         {/* HEADER */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",paddingBottom:12,borderBottom:"1px solid #21303b",marginBottom:12}}>
+        <div className="rpt-header" style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",paddingBottom:12,borderBottom:"1px solid #21303b",marginBottom:12}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <ShieldLogo size={32}/>
             <div>
               <div className="lr-serif" style={{fontSize:"clamp(16px,4vw,20px)",fontWeight:700,letterSpacing:2,color:"#eef3f7",lineHeight:1}}>LEAD RESCUE</div>
-              <div className="lr-mono" style={{fontSize:7,letterSpacing:"3px",color:"#c89456",textTransform:"uppercase",marginTop:3}}>Never miss another call</div>
+              <div className="lr-mono fs-7" style={{letterSpacing:"3px",color:"#c89456",textTransform:"uppercase",marginTop:3}}>Never miss another call</div>
             </div>
           </div>
-          <div className="lr-mono" style={{textAlign:"right",fontSize:8,lineHeight:1.9,color:"#56697b",textTransform:"uppercase",letterSpacing:1}}>
+          <div className="lr-mono fs-8" style={{textAlign:"right",lineHeight:1.9,color:"#56697b",textTransform:"uppercase",letterSpacing:1}}>
             <div>Case <span style={{color:"#aebfcc"}}>#{rptNum}</span></div>
             <div>Recv <span style={{color:"#aebfcc"}}>{fmtRecv(call.created_at)}</span></div>
             <div>Chan <span style={{color:"#aebfcc"}}>Inbound · Voice AI</span></div>
@@ -306,15 +494,15 @@ function Report({ call, rptNum }) {
         {/* HERO */}
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingBottom:12,borderBottom:"1px solid #21303b",marginBottom:12}}>
           <div>
-            <div className="lr-mono" style={{fontSize:7,letterSpacing:"3px",color:"#c89456",textTransform:"uppercase",marginBottom:4}}>Call Intelligence — Dispatch Report</div>
+            <div className="lr-mono fs-7" style={{letterSpacing:"3px",color:"#c89456",textTransform:"uppercase",marginBottom:4}}>Call Intelligence — Dispatch Report</div>
             <div className="lr-serif" style={{fontStyle:"italic",fontSize:"clamp(22px,6vw,30px)",lineHeight:.95,color:"#eef3f7"}}>
               Lead <span style={{color:"#e6b074"}}>rescued.</span>
             </div>
-            <div className="lr-mono" style={{fontSize:7.5,letterSpacing:"1.5px",color:"#56697b",textTransform:"uppercase",marginTop:6}}>Missed on the main line · caught by Voice AI</div>
+            <div className="lr-mono fs-75" style={{letterSpacing:"1.5px",color:"#56697b",textTransform:"uppercase",marginTop:6}}>Missed on the main line · caught by Voice AI</div>
           </div>
           <div style={{display:"inline-flex",alignItems:"center",gap:6,padding:"6px 10px",border:"1px solid #5cb083",background:"rgba(92,176,131,.1)",borderRadius:2,flexShrink:0,marginLeft:8}}>
             <span style={{width:6,height:6,borderRadius:"50%",background:"#5cb083",boxShadow:"0 0 6px #5cb083",display:"inline-block"}}/>
-            <span className="lr-mono" style={{fontSize:9,letterSpacing:2,color:"#5cb083",textTransform:"uppercase",fontWeight:700}}>Recovered</span>
+            <span className="lr-mono fs-9" style={{letterSpacing:2,color:"#5cb083",textTransform:"uppercase",fontWeight:700}}>Recovered</span>
           </div>
         </div>
 
@@ -325,22 +513,22 @@ function Report({ call, rptNum }) {
           <div className="box" style={{borderLeft:"3px solid #c89456",marginBottom:0}}>
             <div style={{display:"inline-flex",alignItems:"center",gap:5,padding:"2px 8px",border:"1px solid #c89456",background:"rgba(200,148,86,.1)",borderRadius:2,marginBottom:6}}>
               <span style={{width:4,height:4,borderRadius:"50%",background:"#e6b074",display:"inline-block"}}/>
-              <span className="lr-mono" style={{fontSize:7.5,letterSpacing:2,color:"#e6b074",textTransform:"uppercase",fontWeight:700}}>New Lead</span>
+              <span className="lr-mono fs-75" style={{letterSpacing:2,color:"#e6b074",textTransform:"uppercase",fontWeight:700}}>New Lead</span>
             </div>
             <div className="lr-serif" style={{fontStyle:"italic",fontSize:"clamp(18px,5vw,24px)",color:"#eef3f7",lineHeight:1,marginBottom:2}}>{d.lead?.name||"Unknown"}</div>
-            <div className="lr-mono" style={{fontSize:7.5,letterSpacing:"1.5px",color:"#56697b",textTransform:"uppercase",marginBottom:6}}>{d.lead?.descriptor||""}</div>
+            <div className="lr-mono fs-75" style={{letterSpacing:"1.5px",color:"#56697b",textTransform:"uppercase",marginBottom:6}}>{d.lead?.descriptor||""}</div>
             <div className="div-h"/>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 12px",marginTop:".3rem",marginBottom:".6rem"}}>
               {[
-                {icon:"ti-device-mobile",label:"Phone",val:d.lead?.phone},
-                {icon:"ti-message-dots",label:"Preferred contact",val:d.lead?.preferred_contact},
-                {icon:"ti-at",label:"Email",val:d.lead?.email},
-                {icon:"ti-antenna",label:"How they found you",val:d.lead?.how_found},
+                {icon:"device-mobile",label:"Phone",val:d.lead?.phone},
+                {icon:"message-dots",label:"Preferred contact",val:d.lead?.preferred_contact},
+                {icon:"at",label:"Email",val:d.lead?.email},
+                {icon:"antenna",label:"How they found you",val:d.lead?.how_found},
               ].map(({icon,label,val})=>(
                 <div key={label}>
                   <span className="field-lbl lr-mono">{label}</span>
                   <div style={{display:"flex",alignItems:"center",gap:4}}>
-                    <i className={`ti ${icon}`} style={{fontSize:10,color:"#56697b"}} aria-hidden="true"/>
+                    <Icon name={icon} className="field-icon" style={{color:"#56697b"}}/>
                     <span className="field-val lr-mono">{val||"Not provided"}</span>
                   </div>
                 </div>
@@ -348,7 +536,7 @@ function Report({ call, rptNum }) {
               <div style={{gridColumn:"1 / -1"}}>
                 <span className="field-lbl lr-mono">Service address</span>
                 <div style={{display:"flex",alignItems:"flex-start",gap:4}}>
-                  <i className="ti ti-map-pin" style={{fontSize:10,color:"#56697b",marginTop:1}} aria-hidden="true"/>
+                  <Icon name="map-pin" className="field-icon" style={{color:"#56697b",marginTop:1}}/>
                   <div>
                     <div className="field-val lr-mono">{d.lead?.address_line1||"Not provided"}</div>
                     <div className="field-val-dim lr-mono">{city}</div>
@@ -359,15 +547,15 @@ function Report({ call, rptNum }) {
             </div>
             <div className="div-h"/>
             <div style={{marginTop:".5rem"}}>
-              <div className="sec-title lr-mono" style={{marginBottom:6}}><i className="ti ti-file-description" aria-hidden="true"/> What happened on the call</div>
+              <div className="sec-title lr-mono" style={{marginBottom:6}}><Icon name="file-description"/> What happened on the call</div>
               <RecapHtml html={d.recap||""}/>
               <div style={{padding:"5px 7px",background:"#0d141b",border:"1px solid rgba(200,148,86,.15)",borderLeft:"2px solid #c89456",borderRadius:2,marginTop:6,marginBottom:5}}>
-                <div className="sec-title lr-mono" style={{fontSize:8,marginBottom:2,color:"#c89456"}}><i className="ti ti-eye" aria-hidden="true"/> Tone read</div>
-                <div style={{fontSize:"clamp(8px,2.2vw,9.5px)",color:"#aebfcc",lineHeight:1.55}}>{d.tone_read||""}</div>
+                <div className="sec-title lr-mono fs-8" style={{marginBottom:2,color:"#c89456"}}><Icon name="eye"/> Tone read</div>
+                <div className="rpt-body" style={{color:"#aebfcc",lineHeight:1.55}}>{d.tone_read||""}</div>
               </div>
               <div style={{padding:"5px 7px",background:"#0d141b",border:"1px solid rgba(92,176,131,.2)",borderLeft:"2px solid #5cb083",borderRadius:2}}>
-                <div className="sec-title lr-mono" style={{fontSize:8,marginBottom:2,color:"#5cb083"}}><i className="ti ti-arrow-right" aria-hidden="true"/> Dispatch note</div>
-                <div style={{fontSize:"clamp(8px,2.2vw,9.5px)",color:"#eef3f7",lineHeight:1.55}}>{d.dispatch_note||""}</div>
+                <div className="sec-title lr-mono fs-8" style={{marginBottom:2,color:"#5cb083"}}><Icon name="arrow-right"/> Dispatch note</div>
+                <div className="rpt-body" style={{color:"#eef3f7",lineHeight:1.55}}>{d.dispatch_note||""}</div>
               </div>
             </div>
           </div>
@@ -377,7 +565,7 @@ function Report({ call, rptNum }) {
 
             {/* Priority */}
             <div className="box" style={{marginBottom:0}}>
-              <div className="sec-title lr-mono"><i className="ti ti-alert-circle" aria-hidden="true"/> Priority</div>
+              <div className="sec-title lr-mono"><Icon name="alert-circle"/> Priority</div>
               {TIERS.map(t => {
                 const isActive = t===tier;
                 const c = TIER_COLORS[t];
@@ -394,10 +582,10 @@ function Report({ call, rptNum }) {
 
             {/* Callback */}
             <div className="box" style={{marginBottom:0}}>
-              <div className="sec-title lr-mono"><i className="ti ti-clock" aria-hidden="true"/> Best callback window</div>
+              <div className="sec-title lr-mono"><Icon name="clock"/> Best callback window</div>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
                 <div className="lr-mono" style={{fontSize:"clamp(14px,4vw,18px)",color:"#e6b074",fontWeight:700,lineHeight:1}}>{d.callback?.time||"Anytime"}</div>
-                <div className="lr-mono" style={{fontSize:7.5,color:"#56697b",letterSpacing:1,textTransform:"uppercase"}}>{d.callback?.period||""}</div>
+                <div className="lr-mono fs-75" style={{color:"#56697b",letterSpacing:1,textTransform:"uppercase"}}>{d.callback?.period||""}</div>
               </div>
               <div style={{display:"flex",gap:3,marginBottom:5}}>
                 {DAY_KEYS.map((dk,i)=>{
@@ -405,16 +593,16 @@ function Report({ call, rptNum }) {
                   return <div key={dk} className={`lr-day lr-mono${on?" on":""}`}><span className="dl">{DAY_LABELS[i]}</span></div>;
                 })}
               </div>
-              <div style={{fontSize:"clamp(8px,2.2vw,9px)",lineHeight:1.5,padding:"4px 6px",background:"#0d141b",border:"1px solid #21303b",borderRadius:2}}>
+              <div className="rpt-note" style={{lineHeight:1.5,padding:"4px 6px",background:"#0d141b",border:"1px solid #21303b",borderRadius:2}}>
                 <span style={{color:"#eef3f7",fontWeight:700}}>"{d.callback?.note||""}"</span>
               </div>
             </div>
 
             {/* Problem + AI Image */}
             <div className="box" style={{borderLeft:"3px solid #e6b074",marginBottom:0,background:"#071020"}}>
-              <div className="sec-title lr-mono"><i className="ti ti-tool" aria-hidden="true"/> Reported problem</div>
+              <div className="sec-title lr-mono"><Icon name="tool"/> Reported problem</div>
               <div className="lr-serif" style={{fontStyle:"italic",fontSize:"clamp(13px,4vw,16px)",fontWeight:700,color:"#e6b074",lineHeight:1,marginBottom:3}}>{d.problem?.title||"Unknown"}</div>
-              <div style={{fontSize:"clamp(8px,2.2vw,9.5px)",color:"#aebfcc",lineHeight:1.4,marginBottom:8}}>{d.problem?.detail||""}</div>
+              <div className="rpt-body" style={{color:"#aebfcc",lineHeight:1.4,marginBottom:8}}>{d.problem?.detail||""}</div>
 
               {/* AI IMAGE OR FALLBACK */}
               <div style={{display:"flex",justifyContent:"center",padding:"4px 0 4px"}}>
@@ -425,7 +613,7 @@ function Report({ call, rptNum }) {
                 <div className="ai-img-label lr-mono">AI · Blueprint · Generated from call</div>
               )}
 
-              <div style={{textAlign:"center",fontSize:"clamp(8px,2vw,9px)",padding:"3px 6px",background:"#0b1520",border:"1px solid #1a3a5c",borderRadius:2,marginTop:5}}>
+              <div className="rpt-quote" style={{textAlign:"center",padding:"3px 6px",background:"#0b1520",border:"1px solid #1a3a5c",borderRadius:2,marginTop:5}}>
                 <span style={{color:"#56697b"}}>In their words: </span>
                 <span style={{color:"#eef3f7",fontWeight:700}}>"{d.problem?.quote||""}"</span>
               </div>
@@ -435,12 +623,12 @@ function Report({ call, rptNum }) {
         </div>
 
         {/* FOOTER */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:12,paddingTop:10,borderTop:"1px solid #21303b"}}>
+        <div className="rpt-footer" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:12,paddingTop:10,borderTop:"1px solid #21303b"}}>
           <div style={{display:"inline-flex",alignItems:"center",gap:4,border:"1px solid rgba(92,176,131,.35)",padding:"2px 8px",borderRadius:2,transform:"rotate(-1.5deg)"}}>
-            <span style={{color:"#5cb083",fontSize:8}}>✓</span>
-            <span className="lr-mono" style={{fontSize:7,letterSpacing:"1.5px",color:"#5cb083",textTransform:"uppercase",fontWeight:700,whiteSpace:"nowrap"}}>Reviewed · Approved for delivery</span>
+            <span className="fs-8" style={{color:"#5cb083"}}>✓</span>
+            <span className="lr-mono fs-7" style={{letterSpacing:"1.5px",color:"#5cb083",textTransform:"uppercase",fontWeight:700,whiteSpace:"nowrap"}}>Reviewed · Approved for delivery</span>
           </div>
-          <div className="lr-mono" style={{textAlign:"right",fontSize:7.5,letterSpacing:"1.5px",color:"#56697b",textTransform:"uppercase",lineHeight:1.8}}>
+          <div className="lr-mono fs-75" style={{textAlign:"right",letterSpacing:"1.5px",color:"#56697b",textTransform:"uppercase",lineHeight:1.8}}>
             <div>Call intelligence by <span style={{color:"#c89456"}}>Lead Rescue</span></div>
             <div>Generated · {fmtNow()}</div>
           </div>
@@ -458,7 +646,30 @@ export default function App() {
   const [showInput, setShowInput] = useState(false);
   const [jsonInput, setJsonInput] = useState("");
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState(false);
+  // mobile accordion: which call is expanded inline (null = all collapsed)
+  const [mobileOpenId, setMobileOpenId] = useState(null);
+  const scrollTargetId = React.useRef(null);
   const rptNum = React.useRef(Math.floor(Math.random()*9000)+1000).current;
+
+  function toggleMobile(call) {
+    // one open at a time; tapping the open row closes it
+    setMobileOpenId(prev => prev === call.id ? null : call.id);
+    setSelected(call);
+    scrollTargetId.current = call.id;
+  }
+
+  // After an expand or collapse, bring that row's header to the top of the
+  // viewport. Runs post-commit so the inline report has already laid out.
+  useEffect(() => {
+    const id = scrollTargetId.current;
+    if (id === null) return;
+    scrollTargetId.current = null;
+    const el = document.getElementById(`lr-row-${id}`);
+    if (el && el.scrollIntoView) {
+      requestAnimationFrame(() => el.scrollIntoView({behavior:"smooth", block:"start"}));
+    }
+  }, [mobileOpenId]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -471,11 +682,13 @@ export default function App() {
     })
     .then(r => r.json())
     .then(rows => {
-      if (rows && rows.length > 0) { setCalls(rows); setSelected(rows[0]); }
-      else { setCalls(SAMPLE_CALLS); setSelected(SAMPLE_CALLS[0]); }
+      // rows arrive created_at.desc, so rows[0] is the newest — auto-expand it
+      // on mobile so the latest report is visible without a tap
+      if (rows && rows.length > 0) { setCalls(rows); setSelected(rows[0]); setMobileOpenId(rows[0].id); }
+      else { setCalls([]); setSelected(null); setMobileOpenId(null); }
       setLoading(false);
     })
-    .catch(() => { setCalls(SAMPLE_CALLS); setSelected(SAMPLE_CALLS[0]); setLoading(false); });
+    .catch(() => { setCalls([]); setSelected(null); setMobileOpenId(null); setLoadError(true); setLoading(false); });
   }, []);
 
   function handleGenerate() {
@@ -483,8 +696,8 @@ export default function App() {
       const parsed = JSON.parse(jsonInput);
       const newCall = { id:Date.now(), created_at:new Date().toISOString(), caller_name:parsed.lead?.name||"Unknown", image_url:null, report_json:parsed };
       setCalls(prev => [newCall, ...prev]);
-      setSelected(newCall);
-      setError(""); setShowInput(false); setJsonInput("");
+      setSelected(newCall); setMobileOpenId(newCall.id);
+      setError(""); setLoadError(false); setShowInput(false); setJsonInput("");
     } catch(e) { setError("Invalid JSON — check the format and try again."); }
   }
 
@@ -523,7 +736,7 @@ export default function App() {
         </div>
       </nav>
 
-      <div style={{padding:"8px 16px",borderBottom:"1px solid #21303b",background:"#0d141b"}}>
+      <div className="lr-tools" style={{padding:"8px 16px",borderBottom:"1px solid #21303b",background:"#0d141b"}}>
         <button className="gen-btn lr-mono" onClick={()=>setShowInput(v=>!v)} style={{fontSize:9}}>
           {showInput?"▲ Hide":"▼ Paste JSON"}
         </button>
@@ -532,19 +745,31 @@ export default function App() {
             <textarea className="json-area" placeholder="Paste raw JSON…" value={jsonInput} onChange={e=>setJsonInput(e.target.value)}/>
             <div style={{display:"flex",gap:8,marginTop:6}}>
               <button className="gen-btn" onClick={handleGenerate} style={{fontSize:9}}>Generate →</button>
-              <button className="gen-btn" style={{opacity:.6,fontSize:9}} onClick={()=>{setCalls(SAMPLE_CALLS);setSelected(SAMPLE_CALLS[0]);setJsonInput("");setError("");}}>Sample</button>
+              <button className="gen-btn" style={{opacity:.6,fontSize:9}} onClick={()=>{setCalls(SAMPLE_CALLS);setSelected(SAMPLE_CALLS[0]);setMobileOpenId(SAMPLE_CALLS[0].id);setJsonInput("");setError("");setLoadError(false);}}>Sample</button>
             </div>
             {error && <div className="err-box">{error}</div>}
           </div>
         )}
       </div>
 
+      {/* MOBILE: the whole page — day groups, call rows, report inline.
+          Hidden at >=768px, where the sidebar log + report pane take over. */}
       <div className="lr-log-mobile">
-        <CallLog calls={calls} selectedId={selected?.id} onSelect={c=>setSelected(c)}/>
+        {loadError
+          ? <div className="lr-mobile-state"><LoadErrorState/></div>
+          : calls.length === 0
+            ? <div className="lr-mobile-state"><EmptyState/></div>
+            : <CallLog calls={calls} accordion expandedId={mobileOpenId}
+                onToggle={toggleMobile} rptNum={rptNum}/>}
       </div>
 
+      {/* DESKTOP: report pane. Hidden at <=767px. */}
       <div className="lr-report">
-        {selected && <Report call={selected} rptNum={rptNum}/>}
+        {loadError
+          ? <LoadErrorState/>
+          : calls.length === 0
+            ? <EmptyState/>
+            : selected && <Report call={selected} rptNum={rptNum}/>}
       </div>
     </>
   );
