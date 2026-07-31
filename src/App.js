@@ -432,17 +432,22 @@ const css = `
     .lr-log-count{font-size:10px}
     .lr-log-item{display:flex;align-items:center;gap:10px;position:relative;
       padding:11px 26px 11px 14px;margin-bottom:6px}
-    .lr-log-main{display:block;flex:1;min-width:0}
+    .lr-log-main{display:block;flex:1 1 auto;min-width:0}
     .lr-log-lbl{display:block;font-size:9px;letter-spacing:1px;color:#56697b;
       text-transform:uppercase;line-height:1;margin-bottom:3px}
-    /* priority: right side, vertically centred, tier-coloured, reason clipped
-       to one line so the row stays scannable rather than becoming a paragraph */
-    .lr-log-pri{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;
-      flex-shrink:0;max-width:42%;margin-left:4px;text-align:right}
-    .lr-log-tier{display:block;font-size:13px;font-weight:700;letter-spacing:1px;
-      text-transform:uppercase;line-height:1.1}
-    .lr-log-reason{display:block;max-width:100%;margin-top:4px;font-size:11px;color:#82a0ba;
-      line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    /* priority: right column, centred stack — tier pill over its reason.
+       ~45% so the reason has room to wrap instead of being clipped to a stub. */
+    .lr-log-pri{display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:6px;flex:0 0 45%;max-width:45%;margin-left:4px;text-align:center}
+    /* pill: tier colour at full strength on the same colour at 15%, both set
+       inline from TIER_DOT_COLORS */
+    .lr-log-tier{display:inline-block;font-size:11px;letter-spacing:.08em;font-weight:500;
+      text-transform:uppercase;line-height:1.2;padding:4px 10px;border-radius:4px}
+    /* max-height caps the clamp: with a centred flex parent some engines let a
+       -webkit-box grow past its line-clamp when the row is tall enough */
+    .lr-log-reason{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;
+      overflow:hidden;width:100%;text-align:center;font-size:12px;color:#82a0ba;
+      line-height:1.35;white-space:normal;max-height:calc(12px * 1.35 * 3)}
     .lr-log-item::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:2px 0 0 2px;background:var(--tier,#82a0ba)}
     .lr-log-dot{display:none}
     .lr-log-name{display:block;font-size:15px;font-weight:600;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.25;margin-bottom:8px}
@@ -479,7 +484,8 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick }) {
       </div>
       {/* mobile only — priority pulled out to the right of the row */}
       <div className="lr-log-pri">
-        <span className="lr-log-tier lr-mono" style={{color:dot}}>{tier}</span>
+        <span className="lr-log-tier lr-mono"
+          style={{color:dot,background:`rgba(${hexToRgb(dot)},.15)`}}>{tier}</span>
         {reason && <span className="lr-log-reason">{reason}</span>}
       </div>
       <span className="lr-log-chevron">›</span>
