@@ -52,6 +52,61 @@ const DANGLING_WORDS = new Set([
   "could","should","near","about","very","really"
 ]);
 
+// The priority column exists to justify the tier — why THIS call is Urgent
+// rather than Standard. When the generator fills priority.reason with a
+// restatement of the problem instead, the row prints the same thing twice
+// (the problem already has its own column), and the one field that could
+// explain the triage decision explains nothing. These two helpers keep only
+// the parts that actually justify the tier.
+
+const STOP_WORDS = new Set([
+  "the","a","an","and","or","but","in","on","at","to","of","for","with",
+  "into","from","over","under","by","is","are","was","were","be","been",
+  "has","have","had","its","their","this","that","not","no","out","up"
+]);
+
+function meaningfulWords(text) {
+  return (text || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/)
+    .filter(w => w.length > 2 && !STOP_WORDS.has(w));
+}
+
+// A segment "restates the problem" when most of its substance already appears
+// in the problem title/detail. 0.6 rather than 1.0 because generators reword
+// slightly ("blowing warm air" vs "warm air blowing") — an exact-match test
+// would catch almost nothing.
+function restatesProblem(segment, problemWords) {
+  const words = meaningfulWords(segment);
+  if (!words.length) return true;
+  const overlap = words.filter(w => problemWords.has(w)).length;
+  return overlap / words.length >= 0.6;
+}
+
+// Keep only the segments that say something the problem column doesn't.
+function distinctReason(reason, problem) {
+  if (!reason) return "";
+  const problemWords = new Set(meaningfulWords(
+    `${problem?.title || ""} ${problem?.detail || ""}`));
+  if (!problemWords.size) return reason;
+  return reason.split("·").map(s => s.trim()).filter(Boolean)
+    .filter(seg => !restatesProblem(seg, problemWords)).join(" · ");
+}
+
+// When the reason was pure restatement there is nothing left to show, but an
+// empty box under the tier pill reads as missing data. The dispatch note on
+// the same report is written to explain urgency ("Elderly resident in active
+// heat — motivated caller"), so its opening clause is a real justification
+// from the same call rather than invented filler. Returns "" if that note is
+// also just the problem again, since showing nothing beats showing a dupe.
+function fallbackJustification(d) {
+  const note = d?.dispatch_note || d?.tone_read || "";
+  const clause = note.split(/[—–.;]/)[0].trim();
+  if (!clause) return "";
+  const problemWords = new Set(meaningfulWords(
+    `${d?.problem?.title || ""} ${d?.problem?.detail || ""}`));
+  if (problemWords.size && restatesProblem(clause, problemWords)) return "";
+  return clause;
+}
+
 // Priority reasons arrive as short segments joined by "·" ("Heat advisory ·
 // elderly resident · getting worse"). When the full string won't fit its slot,
 // summarize by keeping whole leading segments — they carry the triage signal.
@@ -505,11 +560,20 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick }) {
   const tier = call.report_json?.priority?.tier || "Standard";
   const dot = TIER_DOT_COLORS[tier] || "#82a0ba";
   const problem = call.report_json?.problem?.title || "Unknown";
-  const fullReason = call.report_json?.priority?.reason || "";
-  // The reason column is 45% of the row; on a narrow phone that's ~17 chars
-  // per 12px line, so the 3-line slot only guarantees ~50 — budget for that,
-  // not the average phone, or mid-length reasons slip through and clip.
-  const reason = summarizeReason(fullReason, 50);
+  const d = call.report_json || {};
+  const fullReason = d.priority?.reason || "";
+  // Show why this tier was chosen, not the problem again — the problem
+  // already owns the column to the left. Anything the reason shares with it
+  // is dropped; if that empties the field, the dispatch note's urgency
+  // clause stands in, since it explains the same decision.
+  // a segment that was mid-string ("… · elderly resident") leads the box once
+  // the parts before it are dropped, so it needs a capital to read as a phrase
+  const justification = (distinctReason(fullReason, d.problem) || fallbackJustification(d))
+    .replace(/^[a-z]/, c => c.toUpperCase());
+  // The column is 45% of the row; on a narrow phone that's ~17 chars per 12px
+  // line, so the 3-line slot only guarantees ~50 — budget for that, not the
+  // average phone, or mid-length text slips through and clips.
+  const reason = summarizeReason(justification, 50);
   return (
     <div id={rowId} className={`lr-log-item${isActive?" active":""}${expanded?" open":""}`}
       style={{"--tier":dot}} onClick={onClick}
@@ -753,7 +817,15 @@ function Report({ call, rptNum }) {
                     style={isActive?{borderColor:`rgba(${hexToRgb(c.border)},.5)`,borderLeftColor:c.border,background:c.bg}:{}}>
                     <span className="tdot" style={isActive?{background:c.dot,boxShadow:`0 0 5px ${c.dot}`}:{}}/>
                     <span className="tn" style={{color:isActive?c.text:"#56697b"}}>{t.toUpperCase()}</span>
-                    {isActive && <span className="tr">{d.priority?.reason||""}</span>}
+                    {isActive && (
+                      <span className="tr" title={d.priority?.reason||""}>
+                        {/* same de-duplication as the log row, but the report
+                            has room, so fall back to the full reason rather
+                            than showing an empty tier line */}
+                        {distinctReason(d.priority?.reason||"", d.problem)
+                          || d.priority?.reason || ""}
+                      </span>
+                    )}
                   </div>
                 );
               })}
