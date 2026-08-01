@@ -489,8 +489,10 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick }) {
   const dot = TIER_DOT_COLORS[tier] || "#82a0ba";
   const problem = call.report_json?.problem?.title || "Unknown";
   const fullReason = call.report_json?.priority?.reason || "";
-  // ~45% column at 12px type fits about 23 chars a line; three lines ≈ 70.
-  const reason = summarizeReason(fullReason, 70);
+  // The reason column is 45% of the row; on a narrow phone that's ~19 chars
+  // per 12px line, so the 3-line slot only guarantees ~55 — budget for that,
+  // not the average phone, or mid-length reasons slip through and clip.
+  const reason = summarizeReason(fullReason, 55);
   return (
     <div id={rowId} className={`lr-log-item${isActive?" active":""}${expanded?" open":""}`}
       style={{"--tier":dot}} onClick={onClick}
