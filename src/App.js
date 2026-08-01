@@ -734,11 +734,7 @@ function Report({ call, rptNum }) {
                     style={isActive?{borderColor:`rgba(${hexToRgb(c.border)},.5)`,borderLeftColor:c.border,background:c.bg}:{}}>
                     <span className="tdot" style={isActive?{background:c.dot,boxShadow:`0 0 5px ${c.dot}`}:{}}/>
                     <span className="tn" style={{color:isActive?c.text:"#56697b"}}>{t.toUpperCase()}</span>
-                    {isActive && (
-                      <span className="tr" title={d.priority?.reason||""}>
-                        {summarizeReason(d.priority?.reason||"", 80)}
-                      </span>
-                    )}
+                    {isActive && <span className="tr">{d.priority?.reason||""}</span>}
                   </div>
                 );
               })}
