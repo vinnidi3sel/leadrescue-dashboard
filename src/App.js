@@ -43,12 +43,21 @@ function isDayActive(dayKey, days) {
   });
 }
 
+// Words safe to drop from the end of a cut phrase — a summary ending in
+// "into the" reads as broken, one ending in "ceiling" reads as complete.
+const DANGLING_WORDS = new Set([
+  "the","a","an","and","or","but","in","on","at","to","of","for","with",
+  "into","from","over","under","by","is","are","was","has","had","their",
+  "this","that","its","getting","being","be","been","will","would","can",
+  "could","should","near","about","very","really"
+]);
+
 // Priority reasons arrive as short segments joined by "·" ("Heat advisory ·
 // elderly resident · getting worse"). When the full string won't fit its slot,
-// summarize by keeping whole leading segments — they carry the triage signal —
-// instead of letting the box clip mid-word. Falls back to a word-boundary cut
-// when even the first segment is too long. The full text stays reachable via
-// the title attribute where this is used.
+// summarize by keeping whole leading segments — they carry the triage signal.
+// No ellipsis: the point is a short version that reads as complete, not a
+// visible truncation ("…" reads as "cut off" to the person triaging). The
+// full text stays in the report and the title attribute where this is used.
 function summarizeReason(reason, maxChars) {
   if (!reason || reason.length <= maxChars) return reason || "";
   const segs = reason.split("·").map(s => s.trim()).filter(Boolean);
@@ -58,10 +67,16 @@ function summarizeReason(reason, maxChars) {
     if (next.length > maxChars) break;
     out = next;
   }
-  if (out) return `${out} …`;
+  if (out) return out;
+  // single overlong segment: cut at a word boundary, then drop trailing
+  // connective words so the phrase never ends mid-thought
   const cut = reason.slice(0, maxChars);
   const sp = cut.lastIndexOf(" ");
-  return `${(sp > maxChars * 0.6 ? cut.slice(0, sp) : cut).trimEnd()}…`;
+  const words = (sp > maxChars * 0.6 ? cut.slice(0, sp) : cut).trimEnd().split(/\s+/);
+  while (words.length > 1 && DANGLING_WORDS.has(words[words.length - 1].toLowerCase())) {
+    words.pop();
+  }
+  return words.join(" ");
 }
 
 function hexToRgb(hex) {
@@ -465,10 +480,12 @@ const css = `
     .lr-log-tier{display:inline-block;font-size:11px;letter-spacing:.08em;font-weight:500;
       text-transform:uppercase;line-height:1.2;padding:4px 10px;border-radius:4px}
     /* max-height caps the clamp: with a centred flex parent some engines let a
-       -webkit-box grow past its line-clamp when the row is tall enough */
+       -webkit-box grow past its line-clamp when the row is tall enough. The
+       +3px buffer keeps rounding from vertically slicing the third line. */
     .lr-log-reason{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;
       overflow:hidden;width:100%;text-align:center;font-size:12px;color:#82a0ba;
-      line-height:1.35;white-space:normal;max-height:calc(12px * 1.35 * 3)}
+      line-height:1.35;white-space:normal;overflow-wrap:break-word;
+      max-height:calc(12px * 1.35 * 3 + 3px)}
     .lr-log-item::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:2px 0 0 2px;background:var(--tier,#82a0ba)}
     .lr-log-dot{display:none}
     .lr-log-name{display:block;font-size:15px;font-weight:600;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.25;margin-bottom:8px}
@@ -489,10 +506,10 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick }) {
   const dot = TIER_DOT_COLORS[tier] || "#82a0ba";
   const problem = call.report_json?.problem?.title || "Unknown";
   const fullReason = call.report_json?.priority?.reason || "";
-  // The reason column is 45% of the row; on a narrow phone that's ~19 chars
-  // per 12px line, so the 3-line slot only guarantees ~55 — budget for that,
+  // The reason column is 45% of the row; on a narrow phone that's ~17 chars
+  // per 12px line, so the 3-line slot only guarantees ~50 — budget for that,
   // not the average phone, or mid-length reasons slip through and clip.
-  const reason = summarizeReason(fullReason, 55);
+  const reason = summarizeReason(fullReason, 50);
   return (
     <div id={rowId} className={`lr-log-item${isActive?" active":""}${expanded?" open":""}`}
       style={{"--tier":dot}} onClick={onClick}
