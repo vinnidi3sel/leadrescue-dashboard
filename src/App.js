@@ -43,6 +43,27 @@ function isDayActive(dayKey, days) {
   });
 }
 
+// Priority reasons arrive as short segments joined by "·" ("Heat advisory ·
+// elderly resident · getting worse"). When the full string won't fit its slot,
+// summarize by keeping whole leading segments — they carry the triage signal —
+// instead of letting the box clip mid-word. Falls back to a word-boundary cut
+// when even the first segment is too long. The full text stays reachable via
+// the title attribute where this is used.
+function summarizeReason(reason, maxChars) {
+  if (!reason || reason.length <= maxChars) return reason || "";
+  const segs = reason.split("·").map(s => s.trim()).filter(Boolean);
+  let out = "";
+  for (const seg of segs) {
+    const next = out ? `${out} · ${seg}` : seg;
+    if (next.length > maxChars) break;
+    out = next;
+  }
+  if (out) return `${out} …`;
+  const cut = reason.slice(0, maxChars);
+  const sp = cut.lastIndexOf(" ");
+  return `${(sp > maxChars * 0.6 ? cut.slice(0, sp) : cut).trimEnd()}…`;
+}
+
 function hexToRgb(hex) {
   const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return r ? `${parseInt(r[1],16)},${parseInt(r[2],16)},${parseInt(r[3],16)}` : "128,128,128";
@@ -467,7 +488,9 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick }) {
   const tier = call.report_json?.priority?.tier || "Standard";
   const dot = TIER_DOT_COLORS[tier] || "#82a0ba";
   const problem = call.report_json?.problem?.title || "Unknown";
-  const reason = call.report_json?.priority?.reason || "";
+  const fullReason = call.report_json?.priority?.reason || "";
+  // ~45% column at 12px type fits about 23 chars a line; three lines ≈ 70.
+  const reason = summarizeReason(fullReason, 70);
   return (
     <div id={rowId} className={`lr-log-item${isActive?" active":""}${expanded?" open":""}`}
       style={{"--tier":dot}} onClick={onClick}
@@ -486,7 +509,7 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick }) {
       <div className="lr-log-pri">
         <span className="lr-log-tier lr-mono"
           style={{color:dot,background:`rgba(${hexToRgb(dot)},.15)`}}>{tier}</span>
-        {reason && <span className="lr-log-reason">{reason}</span>}
+        {reason && <span className="lr-log-reason" title={fullReason}>{reason}</span>}
       </div>
       <span className="lr-log-chevron">›</span>
     </div>
