@@ -564,7 +564,17 @@ const css = `
     .lr-tools{display:none}
     .lr-log{padding:12px;border-bottom:none}
     .lr-mobile-state{padding:0 12px 16px}
+    /* The report appearing instantly reads as a page swap; easing it in ties
+       it to the row you just pressed, so the eye follows instead of relocating.
+       Guarded below for anyone who asked for less motion. */
     .lr-inline-report{margin:8px 0 12px}
+    @media(prefers-reduced-motion:no-preference){
+      .lr-inline-report{animation:lr-report-in .3s cubic-bezier(.22,.68,.32,1) both}
+    }
+    @keyframes lr-report-in{
+      from{opacity:0;transform:translateY(-8px) scale(.99)}
+      to{opacity:1;transform:none}
+    }
     /* clears the sticky .lr-nav when a row is scrolled to the top */
     /* Trimmed report header. The brand lockup is already in the nav, and the
        eyebrow / subtitle / RECOVERED badge restate what the page says anyway.
@@ -595,10 +605,39 @@ const css = `
     .lr-log-item.open .lr-log-chevron{transform:translateY(-50%) rotate(90deg)}
 
     /* call log as stacked cards */
-    .lr-log-group-hdr{padding:10px 2px}
-    .lr-log-group-label{font-size:10px}
-    .lr-log-caret{font-size:9px}
-    .lr-log-count{font-size:10px}
+    /* A date header is a control, but as bare grey text among grey labels it
+       read as a caption. Give it a surface, the amber the app already uses for
+       "you can act on this", and a 46px target — above the ~44px minimum a
+       fingertip needs, so it can be hit without aiming. */
+    .lr-log-group-hdr{padding:12px 14px;min-height:46px;gap:10px;
+      background:#141d25;border:1px solid #26333f;border-radius:6px;
+      margin-bottom:6px;transition:background .15s ease,border-color .15s ease,
+      transform .09s ease}
+    .lr-log-group-hdr .lr-log-group-label{color:#c89456;font-size:11px}
+    .lr-log-caret{font-size:10px;color:#c89456}
+    .lr-log-count{font-size:10px;color:#82a0ba;background:#0d141b;
+      border:1px solid #26333f;border-radius:10px;padding:2px 8px;line-height:1.4}
+    /* an open group is the one you are reading — mark it and drop the gap so
+       its rows read as belonging to it */
+    .lr-log-group-hdr[aria-expanded="true"]{background:rgba(200,148,86,.07);
+      border-color:rgba(200,148,86,.35);margin-bottom:8px}
+    .lr-log-item{display:flex;align-items:center;gap:10px;position:relative;
+      padding:11px 26px 11px 14px;margin-bottom:6px;
+      -webkit-tap-highlight-color:transparent;
+      transition:border-color .15s ease,background .15s ease,transform .09s ease}
+    /* Press feedback. iOS gives none once tap-highlight is cleared, and a
+       control that does not react to a finger feels broken on touch — the
+       press is the only moment the app can confirm it heard you. */
+    @media(prefers-reduced-motion:reduce){
+      .lr-log-group-hdr,.lr-log-item{transition:background .15s ease,border-color .15s ease}
+    }
+    .lr-log-group-hdr:active{transform:scale(.975);background:rgba(200,148,86,.14);
+      border-color:rgba(200,148,86,.5)}
+    .lr-log-item:active{transform:scale(.985);background:#1a242e;
+      border-color:#3a4a58}
+    @media(prefers-reduced-motion:reduce){
+      .lr-log-group-hdr:active,.lr-log-item:active{transform:none}
+    }
     .lr-log-item{display:flex;align-items:center;gap:10px;position:relative;
       padding:11px 26px 11px 14px;margin-bottom:6px}
     .lr-log-main{display:block;flex:1 1 auto;min-width:0}
