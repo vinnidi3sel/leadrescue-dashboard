@@ -114,6 +114,29 @@ function fallbackJustification(d) {
 // character is visibly missing.
 const CLAUSE_OPENERS = /\s+(?:who|whom|whose|which|that|because|since|while|before|after|until|when|where|so|but|and|or|though|although|unless|with|without|plus|then|as)\s+/gi;
 
+// Trailing scraps that add nothing on their own: "…asked for pricing, got it"
+// is a grammatically complete sentence that still reads like it trailed off,
+// because the last clause carries no information. Dropping it leaves a line
+// that both reads finished and says something.
+const WEAK_TAIL_WORDS = new Set([
+  "got","it","that","this","them","they","those","these","one","ones","so",
+  "too","also","well","done","did","same","such","there","here","now","then",
+  "as","and","but","which","who"
+]);
+
+function trimWeakTail(text) {
+  const parts = text.split(/\s*[,—–]\s*/);
+  if (parts.length < 2) return text;
+  const last = parts[parts.length - 1].trim();
+  const words = last.split(/\s+/);
+  if (words.length <= 3 && words.every(w => WEAK_TAIL_WORDS.has(w.toLowerCase().replace(/[^a-z]/g, "")))) {
+    const cutAt = text.lastIndexOf(parts[parts.length - 1]);
+    const trimmed = text.slice(0, cutAt).replace(/[\s,—–-]+$/, "");
+    if (trimmed.length >= 12) return trimmed;
+  }
+  return text;
+}
+
 function clauseCuts(text) {
   const cuts = [];
   const punctuation = /[.;:!?]|\s+[—–]\s+|,/g;
@@ -135,7 +158,10 @@ function clauseCuts(text) {
 // of stopping mid-clause. No ellipsis — a visible "…" reads as truncation to
 // the person triaging. Full text stays in the report and the title attribute.
 function summarizeReason(reason, maxChars) {
-  if (!reason || reason.length <= maxChars) return reason || "";
+  if (!reason) return "";
+  // an informationless tail reads as trailing off whether the generator wrote
+  // it that way or a clause cut landed there, so strip it in both cases
+  if (reason.length <= maxChars) return trimWeakTail(reason);
 
   if (reason.includes("·")) {
     const segs = reason.split("·").map(s => s.trim()).filter(Boolean);
@@ -154,7 +180,7 @@ function summarizeReason(reason, maxChars) {
   if (fitting.length) {
     const clause = reason.slice(0, fitting[fitting.length - 1]).trim()
       .replace(/[,;:—–-]+$/, "").trim();
-    if (clause.length >= 12) return clause;
+    if (clause.length >= 12) return trimWeakTail(clause);
   }
 
   // no natural break in range: cut at a word boundary and drop trailing
