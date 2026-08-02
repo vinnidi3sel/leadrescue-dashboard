@@ -488,6 +488,10 @@ const css = `
   .rpt-lead-top{display:contents}
   .rpt-lead-head{display:contents}
   .rpt-lead-meta{display:none}
+  /* Halves of the left box. Inert everywhere except mobile, where the report
+     is a single column and Priority slots between them — their .box styling
+     only takes effect once they stop being display:contents. */
+  .rpt-lead-section,.rpt-story-section{display:contents}
   @media(min-width:768px){
     .lr-layout{display:grid;grid-template-columns:300px 1fr;min-height:100vh}
     .lr-sidebar{border-right:1px solid #21303b;background:#0d141b;overflow-y:auto;height:100vh;position:sticky;top:0}
@@ -506,7 +510,21 @@ const css = `
     .lr-layout{display:flex;flex-direction:column}
     .lr-sidebar-nav{display:none}
     .report-grid{display:flex;flex-direction:column;gap:8px}
-    .report-right{display:flex;flex-direction:column;gap:8px}
+    /* Priority reads as triage context for the story that follows, so on a
+       phone it sits between the caller details and the call recap rather than
+       below both. Dissolving the two column wrappers makes every section a
+       direct flex child, which is what the order property needs to work; each
+       half of the old left box then stands on its own as a card. */
+    .rpt-left,.report-right{display:contents}
+    .rpt-lead-section,.rpt-story-section{display:block;margin-bottom:0}
+    .rpt-lead-section{border-left:3px solid #c89456;order:1}
+    .rpt-priority{order:2}
+    .rpt-story-section{order:3}
+    .rpt-callback{order:4}
+    .rpt-problem{order:5}
+    /* separated the two halves inside one card; now they are two cards */
+    .rpt-story-section > .div-h{display:none}
+    .rpt-story-section > div{margin-top:0 !important}
 
     /* readable type on a phone */
     .lr-pad{padding:14px}
@@ -803,8 +821,11 @@ function Report({ call, rptNum }) {
         {/* MAIN GRID */}
         <div className="report-grid">
 
-          {/* LEFT BOX */}
-          <div className="box" style={{borderLeft:"3px solid #c89456",marginBottom:0}}>
+          {/* LEFT BOX. The two halves inside are wrapped so mobile can slot
+              Priority between them; on desktop the wrappers are display:contents,
+              so this renders exactly as one box the way it always has. */}
+          <div className="box rpt-left" style={{borderLeft:"3px solid #c89456",marginBottom:0}}>
+           <div className="box rpt-lead-section">
             <div className="rpt-lead-top">
               {/* mobile only — mirrors the header meta the mobile view drops.
                   Comes first so the name/descriptor flow around the float. */}
@@ -849,6 +870,8 @@ function Report({ call, rptNum }) {
                 </div>
               </div>
             </div>
+           </div>
+           <div className="box rpt-story-section">
             <div className="div-h"/>
             <div style={{marginTop:".5rem"}}>
               <div className="sec-title lr-mono" style={{marginBottom:6}}><Icon name="file-description"/> What happened on the call</div>
@@ -862,13 +885,14 @@ function Report({ call, rptNum }) {
                 <div className="rpt-body" style={{color:"#eef3f7",lineHeight:1.55}}>{d.dispatch_note||""}</div>
               </div>
             </div>
+           </div>
           </div>
 
           {/* RIGHT COLUMN */}
           <div className="report-right">
 
             {/* Priority */}
-            <div className="box" style={{marginBottom:0}}>
+            <div className="box rpt-priority" style={{marginBottom:0}}>
               <div className="sec-title lr-mono"><Icon name="alert-circle"/> Priority</div>
               {TIERS.map(t => {
                 const isActive = t===tier;
@@ -893,7 +917,7 @@ function Report({ call, rptNum }) {
             </div>
 
             {/* Callback */}
-            <div className="box" style={{marginBottom:0}}>
+            <div className="box rpt-callback" style={{marginBottom:0}}>
               <div className="sec-title lr-mono"><Icon name="clock"/> Best callback window</div>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
                 <div className="lr-mono" style={{fontSize:"clamp(14px,4vw,18px)",color:"#e6b074",fontWeight:700,lineHeight:1}}>{d.callback?.time||"Anytime"}</div>
@@ -911,7 +935,7 @@ function Report({ call, rptNum }) {
             </div>
 
             {/* Problem + AI Image */}
-            <div className="box" style={{borderLeft:"3px solid #e6b074",marginBottom:0,background:"#071020"}}>
+            <div className="box rpt-problem" style={{borderLeft:"3px solid #e6b074",marginBottom:0,background:"#071020"}}>
               <div className="sec-title lr-mono"><Icon name="tool"/> Reported problem</div>
               <div className="lr-serif" style={{fontStyle:"italic",fontSize:"clamp(13px,4vw,16px)",fontWeight:700,color:"#e6b074",lineHeight:1,marginBottom:3}}>{d.problem?.title||"Unknown"}</div>
               <div className="rpt-body" style={{color:"#aebfcc",lineHeight:1.4,marginBottom:8}}>{d.problem?.detail||""}</div>
