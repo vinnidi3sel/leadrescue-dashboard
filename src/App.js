@@ -980,20 +980,18 @@ export default function App() {
     const row = document.getElementById(`lr-row-${id}`);
     if (!row) return;
     requestAnimationFrame(() => {
-      const NAV = 56;                                   // sticky .lr-nav height
-      const group = row.closest(".lr-log-group");
-      // Whatever sits above this row must stay on screen: its day header, or the
-      // "N rescued calls" line when this is the first group (it sits right above).
-      const prev = group && group.previousElementSibling;
-      const anchor = prev && prev.classList.contains("lr-log-label")
-        ? prev
-        : group && group.querySelector(".lr-log-group-hdr");
+      const nav = document.querySelector(".lr-nav");
+      // measure rather than assume: the lockup wraps at small widths, and a
+      // hardcoded height would leave the row tucked under the sticky bar
+      const NAV = nav ? nav.getBoundingClientRect().height : 56;
       const y = window.scrollY !== undefined ? window.scrollY : window.pageYOffset;
-      const rowTop = y + row.getBoundingClientRect().top - NAV;
-      // Scroll far enough to bring the report up, but never past the anchor —
-      // so the day header and its count stay visible instead of being pushed off.
-      const limit = anchor ? y + anchor.getBoundingClientRect().top - NAV : rowTop;
-      window.scrollTo({top: Math.max(0, Math.min(rowTop, limit)), behavior:"smooth"});
+      // Put the tapped row itself just below the nav, so the row stays on
+      // screen with its report opening directly beneath it. An earlier version
+      // clamped this to the day header above the row — but that header is
+      // always higher up the page, so the clamp always won and every tap
+      // scrolled to the top of the group instead of to the row.
+      const top = y + row.getBoundingClientRect().top - NAV;
+      window.scrollTo({top: Math.max(0, top), behavior:"smooth"});
     });
   }, [mobileOpenId]);
 
