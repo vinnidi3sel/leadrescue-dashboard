@@ -107,24 +107,58 @@ function fallbackJustification(d) {
   return clause;
 }
 
-// Priority reasons arrive as short segments joined by "·" ("Heat advisory ·
-// elderly resident · getting worse"). When the full string won't fit its slot,
-// summarize by keeping whole leading segments — they carry the triage signal.
-// No ellipsis: the point is a short version that reads as complete, not a
-// visible truncation ("…" reads as "cut off" to the person triaging). The
-// full text stays in the report and the title attribute where this is used.
+// Where a sentence can be cut and still read as a finished thought: the end
+// of a sentence or clause, or just before a word that opens a new one. A cut
+// anywhere else ("…researching pricing and founder") leaves the reader hanging
+// mid-idea, which is what makes a shortened line feel truncated even when no
+// character is visibly missing.
+const CLAUSE_OPENERS = /\s+(?:who|whom|whose|which|that|because|since|while|before|after|until|when|where|so|but|and|or|though|although|unless|with|without|plus|then|as)\s+/gi;
+
+function clauseCuts(text) {
+  const cuts = [];
+  const punctuation = /[.;:!?]|\s+[—–]\s+|,/g;
+  let m;
+  while ((m = punctuation.exec(text)) !== null) cuts.push(m.index);
+  CLAUSE_OPENERS.lastIndex = 0;
+  while ((m = CLAUSE_OPENERS.exec(text)) !== null) {
+    cuts.push(m.index);
+    CLAUSE_OPENERS.lastIndex = m.index + 1;   // allow overlapping matches
+  }
+  return cuts.sort((a, b) => a - b);
+}
+
+// Shorten to something that reads as a complete thought rather than a cut-off
+// one. Priority reasons come through in two shapes: "·"-joined fragments and
+// ordinary prose sentences. Fragments keep whole segments; prose keeps the
+// longest leading clause that fits, so "This is a warm inbound prospect who
+// already uses a competitor" becomes "This is a warm inbound prospect" instead
+// of stopping mid-clause. No ellipsis — a visible "…" reads as truncation to
+// the person triaging. Full text stays in the report and the title attribute.
 function summarizeReason(reason, maxChars) {
   if (!reason || reason.length <= maxChars) return reason || "";
-  const segs = reason.split("·").map(s => s.trim()).filter(Boolean);
-  let out = "";
-  for (const seg of segs) {
-    const next = out ? `${out} · ${seg}` : seg;
-    if (next.length > maxChars) break;
-    out = next;
+
+  if (reason.includes("·")) {
+    const segs = reason.split("·").map(s => s.trim()).filter(Boolean);
+    let out = "";
+    for (const seg of segs) {
+      const next = out ? `${out} · ${seg}` : seg;
+      if (next.length > maxChars) break;
+      out = next;
+    }
+    if (out) return out;
   }
-  if (out) return out;
-  // single overlong segment: cut at a word boundary, then drop trailing
-  // connective words so the phrase never ends mid-thought
+
+  // longest leading clause that fits — the most information that still lands
+  // on a natural stopping point
+  const fitting = clauseCuts(reason).filter(i => i > 0 && i <= maxChars);
+  if (fitting.length) {
+    const clause = reason.slice(0, fitting[fitting.length - 1]).trim()
+      .replace(/[,;:—–-]+$/, "").trim();
+    if (clause.length >= 12) return clause;
+  }
+
+  // no natural break in range: cut at a word boundary and drop trailing
+  // connectives so the phrase at least doesn't end mid-thought
   const cut = reason.slice(0, maxChars);
   const sp = cut.lastIndexOf(" ");
   const words = (sp > maxChars * 0.6 ? cut.slice(0, sp) : cut).trimEnd().split(/\s+/);
@@ -537,10 +571,10 @@ const css = `
     /* max-height caps the clamp: with a centred flex parent some engines let a
        -webkit-box grow past its line-clamp when the row is tall enough. The
        +3px buffer keeps rounding from vertically slicing the third line. */
-    .lr-log-reason{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;
+    .lr-log-reason{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;
       overflow:hidden;width:100%;text-align:center;font-size:12px;color:#82a0ba;
       line-height:1.35;white-space:normal;overflow-wrap:break-word;
-      max-height:calc(12px * 1.35 * 3 + 3px)}
+      max-height:calc(12px * 1.35 * 4 + 3px)}
     .lr-log-item::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:2px 0 0 2px;background:var(--tier,#82a0ba)}
     .lr-log-dot{display:none}
     .lr-log-name{display:block;font-size:15px;font-weight:600;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.25;margin-bottom:8px}
@@ -571,9 +605,10 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick }) {
   const justification = (distinctReason(fullReason, d.problem) || fallbackJustification(d))
     .replace(/^[a-z]/, c => c.toUpperCase());
   // The column is 45% of the row; on a narrow phone that's ~17 chars per 12px
-  // line, so the 3-line slot only guarantees ~50 — budget for that, not the
-  // average phone, or mid-length text slips through and clips.
-  const reason = summarizeReason(justification, 50);
+  // line. The left column (caller / reason / received) always runs taller than
+  // this one, so a 4th line costs no row height and buys ~65 chars — enough
+  // for a whole opening clause rather than a fragment of one.
+  const reason = summarizeReason(justification, 65);
   return (
     <div id={rowId} className={`lr-log-item${isActive?" active":""}${expanded?" open":""}`}
       style={{"--tier":dot}} onClick={onClick}
