@@ -796,14 +796,49 @@ function EmptyState() {
   );
 }
 
-function LoadErrorState() {
+// No ?client= in the URL. Distinct from "no calls" on purpose: silently
+// defaulting to a shared dashboard would show one client another's calls.
+function NoClientState() {
+  return (
+    <div className="lr-card">
+      <div className="lr-grid-bg"/>
+      <span className="lr-crop tl"/><span className="lr-crop tr"/>
+      <span className="lr-crop bl"/><span className="lr-crop br"/>
+      <div className="lr-pad" style={{display:"flex",flexDirection:"column",alignItems:"center",textAlign:"center",gap:4,padding:"40px 20px"}}>
+        <ShieldLogo size={38}/>
+        <div className="lr-serif lr-empty-title" style={{marginTop:8}}>No dashboard specified</div>
+        <div className="lr-empty-body">This link is missing its dashboard ID. Open the link from your setup email — it ends with <span className="lr-mono">?client=…</span></div>
+      </div>
+    </div>
+  );
+}
+
+const FAILURE_LABEL = { api:"API error", network:"Network error", timeout:"Request timed out" };
+
+function LoadErrorState({ clientId, failure, onRetry }) {
+  const f = failure || {};
+  // one readable block: whatever PostgREST told us, or the transport error
+  const detail = [
+    f.message && `message: ${f.message}`,
+    f.code    && `code: ${f.code}`,
+    f.details && `details: ${f.details}`,
+    f.hint    && `hint: ${f.hint}`
+  ].filter(Boolean).join("\n");
   return (
     <div className="lr-card" style={{borderColor:"rgba(220,91,78,.4)"}}>
       <div className="lr-grid-bg"/>
       <div className="lr-pad" style={{display:"flex",flexDirection:"column",alignItems:"center",textAlign:"center",gap:4,padding:"40px 20px"}}>
-        <div className="lr-mono fs-9" style={{letterSpacing:2,color:"#f0a59b",textTransform:"uppercase"}}>Connection error</div>
+        <div className="lr-mono fs-9" style={{letterSpacing:2,color:"#f0a59b",textTransform:"uppercase"}}>{FAILURE_LABEL[f.kind] || "Connection error"}</div>
         <div className="lr-serif lr-empty-title" style={{marginTop:6}}>Couldn't load your calls</div>
         <div className="lr-empty-body">We couldn't reach the call log just now. Check your connection and refresh — nothing has been lost.</div>
+        {detail && (
+          <code style={{fontSize:12,fontFamily:"monospace",color:"#d06b5f",wordBreak:"break-word",
+            whiteSpace:"pre-wrap",padding:8,marginTop:12,background:"rgba(255,255,255,0.04)",
+            borderRadius:6,textAlign:"left",maxWidth:"90%",marginLeft:"auto",marginRight:"auto",
+            display:"block"}}>{detail}</code>
+        )}
+        <div style={{fontSize:11,color:"#6b7c8a"}}>client: {clientId || "(none)"}</div>
+        <button className="gen-btn lr-mono" onClick={onRetry} style={{marginTop:16}}>Retry</button>
       </div>
     </div>
   );
@@ -1017,11 +1052,16 @@ function Report({ call, rptNum }) {
 export default function App() {
   const [calls, setCalls] = useState([]);
   const [selected, setSelected] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // "loading" | "no-client" | "ready" | "error" — an API failure must never be
+  // able to reach the zero-rows branch and render as "No calls yet"
+  const [status, setStatus] = useState("loading");
+  const [failure, setFailure] = useState(null);
   const [showInput, setShowInput] = useState(false);
   const [jsonInput, setJsonInput] = useState("");
   const [error, setError] = useState("");
-  const [loadError, setLoadError] = useState(false);
+  const clientId = React.useRef(
+    (new URLSearchParams(window.location.search).get("client") || "").trim()
+  ).current;
   // mobile accordion: which call is expanded inline (null = all collapsed)
   const [mobileOpenId, setMobileOpenId] = useState(null);
   const scrollTargetId = React.useRef(null);
@@ -1058,25 +1098,61 @@ export default function App() {
     });
   }, [mobileOpenId]);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const clientId = params.get("client") || "demo-client";
-    fetch(`https://xofgjzfofmjziycqprhq.supabase.co/rest/v1/calls?select=*&client_id=eq.${clientId}&order=created_at.desc&limit=50`, {
+  const loadCalls = React.useCallback(() => {
+    // No tenant, no request.
+    if (!clientId) { setStatus("no-client"); return; }
+    setStatus("loading"); setFailure(null);
+    const clear = () => { setCalls([]); setSelected(null); setMobileOpenId(null); };
+    // iOS Safari can leave a request pending indefinitely on a flaky connection
+    // rather than rejecting, which strands the app on the loading screen.
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 15000);
+    fetch(`https://xofgjzfofmjziycqprhq.supabase.co/rest/v1/calls?select=*&client_id=eq.${encodeURIComponent(clientId)}&order=created_at.desc&limit=50`, {
+      signal: ctl.signal,
+      cache: "no-store",              // iOS Safari serves stale cached failures aggressively
       headers: {
         apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvZmdqemZvZm1qeml5Y3FwcmhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NDI1MDcsImV4cCI6MjA5NzMxODUwN30.qdn-YSphrwgMee0vdpPgE1RudBw0Z-zKOBPXmnZ4aY8",
         Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvZmdqemZvZm1qeml5Y3FwcmhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NDI1MDcsImV4cCI6MjA5NzMxODUwN30.qdn-YSphrwgMee0vdpPgE1RudBw0Z-zKOBPXmnZ4aY8`
       }
     })
-    .then(r => r.json())
-    .then(rows => {
+    .then(r => r.json().catch(() => null).then(body => ({ok: r.ok, http: r.status, body})))
+    .then(({ok, http, body}) => {
+      clearTimeout(timer);
+      // PostgREST answers a failure with 4xx and a JSON error object, which
+      // parses cleanly. Without this check it reaches the zero-rows branch and
+      // an auth, RLS or bad-client_id failure renders as "No calls yet".
+      if (!ok || !Array.isArray(body)) {
+        clear();
+        setFailure({
+          kind: "api",
+          message: (body && body.message) || `HTTP ${http}`,
+          code: (body && body.code) || String(http),
+          details: (body && body.details) || "",
+          hint: (body && body.hint) || ""
+        });
+        setStatus("error");
+        return;
+      }
       // rows arrive created_at.desc, so rows[0] is the newest — auto-expand it
       // on mobile so the latest report is visible without a tap
-      if (rows && rows.length > 0) { setCalls(rows); setSelected(rows[0]); setMobileOpenId(rows[0].id); }
+      if (body.length > 0) { setCalls(body); setSelected(body[0]); setMobileOpenId(body[0].id); }
       else { setCalls([]); setSelected(null); setMobileOpenId(null); }
-      setLoading(false);
+      setStatus("ready");
     })
-    .catch(() => { setCalls([]); setSelected(null); setMobileOpenId(null); setLoadError(true); setLoading(false); });
-  }, []);
+    .catch(err => {
+      clearTimeout(timer);
+      const timedOut = ctl.signal.aborted;
+      clear();
+      setFailure({
+        kind: timedOut ? "timeout" : "network",
+        message: timedOut ? "Request timed out after 15s" : ((err && err.message) || String(err)),
+        code: "", details: "", hint: ""
+      });
+      setStatus("error");
+    });
+  }, [clientId]);
+
+  useEffect(() => { loadCalls(); }, [loadCalls]);
 
   function handleGenerate() {
     try {
@@ -1084,11 +1160,11 @@ export default function App() {
       const newCall = { id:Date.now(), created_at:new Date().toISOString(), caller_name:parsed.lead?.name||"Unknown", image_url:null, report_json:parsed };
       setCalls(prev => [newCall, ...prev]);
       setSelected(newCall); setMobileOpenId(newCall.id);
-      setError(""); setLoadError(false); setShowInput(false); setJsonInput("");
+      setError(""); setStatus("ready"); setShowInput(false); setJsonInput("");
     } catch(e) { setError("Invalid JSON — check the format and try again."); }
   }
 
-  if (loading) return (
+  if (status === "loading") return (
     <div style={{background:"#0b1014",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
       <span style={{fontFamily:"monospace",fontSize:11,color:"#c89456",letterSpacing:2}}>LOADING CALLS...</span>
     </div>
@@ -1102,6 +1178,14 @@ export default function App() {
       <CallLog calls={calls} selectedId={selected?.id} onSelect={c=>{setSelected(c);window.scrollTo&&window.scrollTo({top:0,behavior:"smooth"})}}/>
     </>
   );
+
+  // Resolved once so the mobile and desktop panes cannot disagree. null means
+  // there is real data to render.
+  const stateCard =
+      status === "no-client" ? <NoClientState/>
+    : status === "error"     ? <LoadErrorState clientId={clientId} failure={failure} onRetry={loadCalls}/>
+    : calls.length === 0      ? <EmptyState/>
+    : null;
 
   const main = (
     <>
@@ -1122,7 +1206,7 @@ export default function App() {
             <textarea className="json-area" placeholder="Paste raw JSON…" value={jsonInput} onChange={e=>setJsonInput(e.target.value)}/>
             <div style={{display:"flex",gap:8,marginTop:6}}>
               <button className="gen-btn" onClick={handleGenerate} style={{fontSize:9}}>Generate →</button>
-              <button className="gen-btn" style={{opacity:.6,fontSize:9}} onClick={()=>{setCalls(SAMPLE_CALLS);setSelected(SAMPLE_CALLS[0]);setMobileOpenId(SAMPLE_CALLS[0].id);setJsonInput("");setError("");setLoadError(false);}}>Sample</button>
+              <button className="gen-btn" style={{opacity:.6,fontSize:9}} onClick={()=>{setCalls(SAMPLE_CALLS);setSelected(SAMPLE_CALLS[0]);setMobileOpenId(SAMPLE_CALLS[0].id);setJsonInput("");setError("");setStatus("ready");}}>Sample</button>
             </div>
             {error && <div className="err-box">{error}</div>}
           </div>
@@ -1132,21 +1216,15 @@ export default function App() {
       {/* MOBILE: the whole page — day groups, call rows, report inline.
           Hidden at >=768px, where the sidebar log + report pane take over. */}
       <div className="lr-log-mobile">
-        {loadError
-          ? <div className="lr-mobile-state"><LoadErrorState/></div>
-          : calls.length === 0
-            ? <div className="lr-mobile-state"><EmptyState/></div>
-            : <CallLog calls={calls} accordion expandedId={mobileOpenId}
-                onToggle={toggleMobile} rptNum={rptNum}/>}
+        {stateCard
+          ? <div className="lr-mobile-state">{stateCard}</div>
+          : <CallLog calls={calls} accordion expandedId={mobileOpenId}
+              onToggle={toggleMobile} rptNum={rptNum}/>}
       </div>
 
       {/* DESKTOP: report pane. Hidden at <=767px. */}
       <div className="lr-report">
-        {loadError
-          ? <LoadErrorState/>
-          : calls.length === 0
-            ? <EmptyState/>
-            : selected && <Report call={selected} rptNum={rptNum}/>}
+        {stateCard || (selected && <Report call={selected} rptNum={rptNum}/>)}
       </div>
     </>
   );
