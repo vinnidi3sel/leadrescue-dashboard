@@ -517,6 +517,17 @@ const css = `
        half of the old left box then stands on its own as a card. */
     .rpt-left,.report-right{display:contents}
     .rpt-lead-section,.rpt-story-section{display:block;margin-bottom:0}
+    /* One field per row on a phone. A 1fr column cannot shrink below its
+       content's min-content width, and a real email address ("vinny.test.
+       94630@rescuedcall.com") has no break opportunity — so in two columns it
+       pushed the second column off the screen entirely, taking Preferred
+       contact and How they found you with it. Full width fits the address,
+       and the labels stop wrapping into two lines as a bonus. */
+    .rpt-fields{grid-template-columns:1fr !important;gap:10px 0 !important}
+    /* belt and braces: a grid item defaults to min-width:auto, so without this
+       a longer address than any seen so far could overflow again */
+    .rpt-fields > div{min-width:0}
+    .field-val,.field-val-dim{overflow-wrap:anywhere}
     .rpt-lead-section{border-left:3px solid #c89456;order:1}
     .rpt-priority{order:2}
     .rpt-story-section{order:3}
@@ -917,7 +928,7 @@ function Report({ call, rptNum }) {
               </div>
             </div>
             <div className="div-h"/>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 12px",marginTop:".3rem",marginBottom:".6rem"}}>
+            <div className="rpt-fields" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 12px",marginTop:".3rem",marginBottom:".6rem"}}>
               {[
                 {icon:"device-mobile",label:"Phone",val:d.lead?.phone},
                 {icon:"message-dots",label:"Preferred contact",val:d.lead?.preferred_contact},
