@@ -758,7 +758,18 @@ function CallLog({ calls, selectedId, onSelect, accordion=false, expandedId=null
               type="button"
               className="lr-log-group-hdr"
               aria-expanded={open}
-              onClick={()=>setOpenOverrides(prev => ({...prev, [date]: !open}))}
+              onClick={()=>{
+                const next = !open;
+                // Collapsing the group that holds the open inline report must
+                // close that report too — otherwise hasCurrent keeps forcing
+                // the group open and the header ignores every tap. (Today is
+                // the usual victim: the newest call auto-expands on load.)
+                if (!next && accordion && hasCurrent) {
+                  const current = items.find(c => c.id === currentId);
+                  if (current) onToggle(current);
+                }
+                setOpenOverrides(prev => ({...prev, [date]: next}));
+              }}
             >
               <span className={`lr-log-caret${open?" open":""}`}>▶</span>
               <span className="lr-log-group-label lr-mono">{date}</span>
