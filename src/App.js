@@ -336,9 +336,13 @@ const css = `
   .lr-log-tier{flex-shrink:0;white-space:nowrap;font-size:7.5px;letter-spacing:.08em;
     font-weight:600;text-transform:uppercase;line-height:1.2;padding:3px 6px;border-radius:3px}
   /* order:1 drops it below everything else; flex-basis 100% gives it the line
-     to itself. Ellipsis rather than a third line. */
-  .lr-log-problem{order:1;flex:0 0 100%;min-width:0;font-size:9.5px;color:#7d8fa0;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+     to itself. The label holds its width; only the value ellipsises. */
+  .lr-log-problem{order:1;flex:0 0 100%;min-width:0;display:flex;align-items:baseline;
+    gap:6px;line-height:1.3}
+  .lr-log-problem-lbl{flex-shrink:0;font-size:7.5px;letter-spacing:1px;
+    text-transform:uppercase;color:#56697b}
+  .lr-log-problem-val{min-width:0;font-size:9.5px;color:#7d8fa0;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .lr-log-chevron{font-size:10px;color:#56697b;flex-shrink:0}
   /* swipe shell — inert on desktop, which gets no swipe actions this pass */
   .lr-swipe{display:contents}
@@ -352,9 +356,18 @@ const css = `
     background:rgba(220,91,78,.06);border-radius:3px}
   .lr-trash-warn{font-size:10px;color:#f0a59b;line-height:1.4;flex:1;min-width:140px}
   .lr-view-btn.danger{border-color:#a33f35;color:#f0a59b;background:rgba(220,91,78,.12)}
-  .lr-restore{flex-shrink:0;background:none;border:1px solid #378add;color:#378add;
-    font-size:8px;letter-spacing:1px;text-transform:uppercase;padding:3px 7px;
-    border-radius:3px;cursor:pointer}
+  /* mobile keeps an always-visible Restore; desktop puts it in the revealed
+     action strip instead, so a row shows nothing until it is asked to */
+  .lr-restore{display:none;flex-shrink:0;background:none;border:1px solid #378add;
+    color:#378add;font-size:8px;letter-spacing:1px;text-transform:uppercase;
+    padding:3px 7px;border-radius:3px;cursor:pointer}
+  .lr-log-actions{order:2;flex:0 0 100%;display:flex;gap:6px;margin-top:4px}
+  .lr-log-act{font-family:'DejaVu Sans Mono','Liberation Mono',monospace;font-size:8px;
+    letter-spacing:1px;text-transform:uppercase;padding:3px 9px;border-radius:3px;
+    cursor:pointer;border:1px solid}
+  .lr-log-act.arch{border-color:#3a4a58;color:#aebfcc;background:rgba(43,58,71,.5)}
+  .lr-log-act.del{border-color:#a33f35;color:#f0a59b;background:rgba(163,63,53,.15)}
+  .lr-log-act.rest{border-color:#378add;color:#378add;background:rgba(55,138,221,.08)}
   .lr-restore:hover{background:rgba(55,138,221,.12)}
   /* view switcher lives in the log's own header row */
   .lr-log-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
@@ -605,9 +618,12 @@ const css = `
        shares its width with the problem title, so tier and name go back up. */
     .lr-log-tier{font-size:10px;padding:3px 9px;border-radius:4px}
     .lr-log-name{font-size:14px;font-weight:600;line-height:1.25}
-    .lr-log-problem{font-size:11.5px;line-height:1.3}
+    .lr-log-problem{line-height:1.3;gap:7px}
+    .lr-log-problem-lbl{font-size:9px}
+    .lr-log-problem-val{font-size:11.5px}
     .lr-log-time{font-size:11px;line-height:1.2}
-    .lr-restore{font-size:10px;padding:4px 9px}
+    .lr-restore{display:inline-block;font-size:10px;padding:4px 9px}
+    .lr-log-actions{display:none}          /* mobile reveals actions by swipe */
     .lr-log-views{gap:5px}
     .lr-view-btn{font-size:10px;padding:4px 9px}
     .lr-log-none{font-size:13px}
@@ -629,7 +645,8 @@ const SWIPE_W = 96;   // one action per view — see swipeAction in App
 // only the type scale is per-platform.
 // The dot stays hidden on mobile — the 4px --tier edge bar already carries the
 // colour there, and a second marker 11px away would encode the tier twice.
-function CallLogItem({ call, isActive, expanded, rowId, onClick, swipeAction, onRestore }) {
+function CallLogItem({ call, isActive, expanded, rowId, onClick, swipeAction, onRestore,
+                       revealed, actions }) {
   const tier = call.report_json?.priority?.tier || "Standard";
   const dot = TIER_DOT_COLORS[tier] || "#82a0ba";
   const problem = call.report_json?.problem?.title || "";
@@ -695,13 +712,27 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick, swipeAction, on
         <span className="lr-log-tier lr-mono"
           style={{color:dot,background:`rgba(${hexToRgb(dot)},.15)`}}>{tier}</span>
         <span className="lr-log-name lr-mono">{call.caller_name||"Unknown"}</span>
-        {problem && <span className="lr-log-problem">{problem}</span>}
+        {problem && (
+          <span className="lr-log-problem">
+            <span className="lr-log-problem-lbl lr-mono">Reason for call</span>
+            <span className="lr-log-problem-val">{problem}</span>
+          </span>
+        )}
         <span className="lr-log-time lr-mono">{fmtTime(call.created_at)}</span>
         {onRestore && (
           <button type="button" className="lr-restore lr-mono"
             onClick={e => {e.stopPropagation(); onRestore(call);}}>Restore</button>
         )}
         <span className="lr-log-chevron">›</span>
+        {/* desktop only — revealed by a second click on an already-open row */}
+        {revealed && actions && actions.length > 0 && (
+          <div className="lr-log-actions">
+            {actions.map(a => (
+              <button key={a.label} type="button" className={`lr-log-act ${a.cls}`}
+                onClick={e => {e.stopPropagation(); a.run(call);}}>{a.label}</button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -718,10 +749,12 @@ const EMPTY_VIEW = { log:"No calls in the log.", archive:"Nothing archived.", tr
 //  - default (desktop sidebar): rows select, the report lives in its own pane
 //  - accordion (mobile): rows toggle, the report renders inline under the open row
 function CallLog({ calls, selectedId, onSelect, accordion=false, expandedId=null, onToggle, rptNum,
-                   view="log", onViewChange, swipeAction, onRestore, onEmptyTrash }) {
+                   view="log", onViewChange, swipeAction, onRestore, onEmptyTrash, rowActions }) {
   // date label -> bool. Absent = use the default (Today open, everything else collapsed).
   const [openOverrides, setOpenOverrides] = useState({});
   const [confirmEmpty, setConfirmEmpty] = useState(false);
+  // desktop: which row has its actions showing (one at a time, null = none)
+  const [revealedId, setRevealedId] = useState(null);
   const currentId = accordion ? expandedId : selectedId;
 
   const groups = [];
@@ -766,11 +799,21 @@ function CallLog({ calls, selectedId, onSelect, accordion=false, expandedId=null
         </div>
       )}
       {calls.length === 0 && <div className="lr-log-none lr-mono">{EMPTY_VIEW[view]}</div>}
-      {groups.map(([date, items]) => {
+      {groups.map(([date, items], groupIdx) => {
         const hasCurrent = items.some(c => c.id === currentId);
-        const userOpen = openOverrides[date] !== undefined ? openOverrides[date] : date === "Today";
-        // a group holding the current call is always shown, whatever the toggle says
-        const open = hasCurrent || userOpen;
+        // Default the most recent group open rather than the literal "Today":
+        // on a day with no calls yet there is no Today group, and keying off the
+        // label left every group collapsed and the list empty. groups[] is built
+        // from a created_at.desc fetch, so index 0 is always the newest day.
+        const userOpen = openOverrides[date] !== undefined ? openOverrides[date] : groupIdx === 0;
+        // Forcing a group open because it holds the current call only makes sense
+        // on mobile, where the report renders INSIDE the group — collapsing there
+        // would hide the very thing you are reading, so PR #12 closes the report
+        // too. On desktop the report lives in its own pane, so a group's collapse
+        // state is purely a list concern and the selection must not veto it.
+        // Without this guard the group holding the selection can never collapse,
+        // which is Today on every load.
+        const open = (accordion && hasCurrent) || userOpen;
         return (
           <div key={date} className="lr-log-group">
             <button
@@ -801,13 +844,22 @@ function CallLog({ calls, selectedId, onSelect, accordion=false, expandedId=null
                   <CallLogItem
                     call={c}
                     swipeAction={accordion ? swipeAction : null}
-                    onRestore={onRestore}
+                    onRestore={accordion ? onRestore : null}
+                    revealed={!accordion && revealedId === c.id}
+                    actions={accordion ? null : rowActions}
                     isActive={isCurrent}
                     expanded={accordion && isCurrent}
                     // id only in accordion mode — the desktop log renders the same
                     // calls, and duplicate DOM ids would break the scroll target
                     rowId={accordion ? `lr-row-${c.id}` : undefined}
-                    onClick={()=> accordion ? onToggle(c) : onSelect(c)}
+                    // Desktop: a row click never closes a report. First click on a
+                    // different row opens it and clears any revealed actions; clicking
+                    // the row that is already open toggles its actions instead.
+                    onClick={()=>{
+                      if (accordion) { onToggle(c); return; }
+                      if (currentId !== c.id) { onSelect(c); setRevealedId(null); }
+                      else { setRevealedId(prev => prev === c.id ? null : c.id); }
+                    }}
                   />
                   {accordion && isCurrent && (
                     <div className="lr-inline-report">
@@ -1186,6 +1238,14 @@ export default function App() {
     .catch(() => { setCalls(before); });
   }, [calls, clientId]);
 
+  // Desktop reveal strip. Same destinations as the mobile swipe, but the archive
+  // and trash views also carry Restore, which mobile shows as a standing button.
+  const rowActions =
+      view === "log"     ? [{label:"Archive", cls:"arch", run:archiveCall}]
+    : view === "archive" ? [{label:"Delete",  cls:"del",  run:deleteCall},
+                            {label:"Restore", cls:"rest", run:restoreCall}]
+    :                      [{label:"Restore", cls:"rest", run:restoreCall}];
+
   // one action per view: archive out of the log, delete out of the archive,
   // nothing in the trash — its only exits are Restore and Empty trash
   const swipeAction =
@@ -1278,6 +1338,7 @@ export default function App() {
       </div>
       <CallLog calls={visibleCalls} selectedId={selected?.id} view={view} onViewChange={setView}
         onRestore={view==="log" ? null : restoreCall} onEmptyTrash={emptyTrash}
+        rowActions={rowActions}
         onSelect={c=>{setSelected(c);window.scrollTo&&window.scrollTo({top:0,behavior:"smooth"})}}/>
     </>
   );
