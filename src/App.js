@@ -322,9 +322,12 @@ const css = `
   .lr-log-caret{display:inline-block;font-size:7px;color:#56697b;transform:rotate(0deg);transition:transform .18s ease;flex-shrink:0}
   .lr-log-caret.open{transform:rotate(90deg)}
   .lr-log-count{margin-left:auto;font-size:8px;letter-spacing:1px;color:#56697b;flex-shrink:0}
-  .lr-log-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #21303b;border-radius:3px;background:#141d25;margin-bottom:4px;cursor:pointer;transition:border-color .15s}
+  .lr-log-item{display:flex;align-items:center;flex-wrap:wrap;row-gap:3px;gap:8px;padding:8px 10px;border:1px solid #21303b;border-radius:3px;background:#141d25;margin-bottom:4px;cursor:pointer;transition:border-color .15s}
   .lr-log-item:hover{border-color:#2b3a47}
-  .lr-log-item.active{border-color:#c89456;background:rgba(200,148,86,.06)}
+  /* layered over the opaque base rather than replacing it — a translucent row
+     let the swipe panel behind it paint through, which is BUG 1 */
+  .lr-log-item.active{border-color:#c89456;
+    background:linear-gradient(rgba(200,148,86,.06),rgba(200,148,86,.06)),#141d25}
   .lr-log-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
   .lr-log-name{font-size:11px;color:#eef3f7;font-weight:500;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .lr-log-time{font-size:9px;color:#56697b;flex-shrink:0}
@@ -332,6 +335,10 @@ const css = `
      both set inline from TIER_DOT_COLORS. nowrap so EMERGENCY never breaks. */
   .lr-log-tier{flex-shrink:0;white-space:nowrap;font-size:7.5px;letter-spacing:.08em;
     font-weight:600;text-transform:uppercase;line-height:1.2;padding:3px 6px;border-radius:3px}
+  /* order:1 drops it below everything else; flex-basis 100% gives it the line
+     to itself. Ellipsis rather than a third line. */
+  .lr-log-problem{order:1;flex:0 0 100%;min-width:0;font-size:9.5px;color:#7d8fa0;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
   .lr-log-chevron{font-size:10px;color:#56697b;flex-shrink:0}
   /* swipe shell — inert on desktop, which gets no swipe actions this pass */
   .lr-swipe{display:contents}
@@ -340,6 +347,11 @@ const css = `
     font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#eef3f7;cursor:pointer}
   .lr-swipe-btn.arch{background:#2b3a47}
   .lr-swipe-btn.del{background:#a33f35}
+  .lr-trash-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    padding:8px 10px;margin-bottom:8px;border:1px solid rgba(220,91,78,.35);
+    background:rgba(220,91,78,.06);border-radius:3px}
+  .lr-trash-warn{font-size:10px;color:#f0a59b;line-height:1.4;flex:1;min-width:140px}
+  .lr-view-btn.danger{border-color:#a33f35;color:#f0a59b;background:rgba(220,91,78,.12)}
   .lr-restore{flex-shrink:0;background:none;border:1px solid #378add;color:#378add;
     font-size:8px;letter-spacing:1px;text-transform:uppercase;padding:3px 7px;
     border-radius:3px;cursor:pointer}
@@ -538,7 +550,8 @@ const css = `
     .rpt-lead-meta{display:block;float:right;max-width:48%;margin:0 0 4px 12px;
       text-align:right;line-height:1.7;color:#56697b;text-transform:uppercase;letter-spacing:.5px}
 
-    .lr-log-item.open{border-color:#c89456;background:rgba(200,148,86,.06)}
+    .lr-log-item.open{border-color:#c89456;
+      background:linear-gradient(rgba(200,148,86,.06),rgba(200,148,86,.06)),#141d25}
     .lr-log-item.open .lr-log-chevron{transform:translateY(-50%) rotate(90deg)}
 
     /* call log as stacked cards */
@@ -577,20 +590,23 @@ const css = `
     }
     /* the swipe shell owns the row's spacing and clips the action panel */
     .lr-swipe{display:block;position:relative;overflow:hidden;border-radius:3px;margin-bottom:6px}
-    .lr-swipe-actions{display:flex;position:absolute;top:0;right:0;bottom:0;width:168px}
+    .lr-swipe-actions{display:flex;position:absolute;top:0;right:0;bottom:0;width:96px}
     .lr-swipe-btn{flex:1}
     /* pan-y keeps vertical scrolling with the browser and hands us the
        horizontal gesture, so the drag needs no preventDefault */
-    .lr-log-item{display:flex;align-items:center;gap:9px;position:relative;
-      padding:12px 26px 12px 14px;margin-bottom:0;touch-action:pan-y}
+    .lr-log-item{display:flex;align-items:center;flex-wrap:wrap;row-gap:3px;gap:8px;
+      position:relative;padding:11px 24px 11px 13px;margin-bottom:0;touch-action:pan-y}
     .lr-log-item::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:2px 0 0 2px;background:var(--tier,#82a0ba)}
     /* the edge bar already carries the tier colour here — see the note on
        CallLogItem for why the dot stays hidden on a phone */
     .lr-log-dot{display:none}
-    .lr-log-tier{font-size:10px;padding:4px 9px;border-radius:4px}
-    .lr-log-name{flex:1;min-width:0;font-size:14px;font-weight:600;white-space:nowrap;
-      overflow:hidden;text-overflow:ellipsis;line-height:1.25}
-    .lr-log-time{font-size:11px;line-height:1.2;flex-shrink:0}
+    /* Same two-line structure as desktop — order and flex come from the base
+       rules, so only the type scale differs between platforms. Line 1 no longer
+       shares its width with the problem title, so tier and name go back up. */
+    .lr-log-tier{font-size:10px;padding:3px 9px;border-radius:4px}
+    .lr-log-name{font-size:14px;font-weight:600;line-height:1.25}
+    .lr-log-problem{font-size:11.5px;line-height:1.3}
+    .lr-log-time{font-size:11px;line-height:1.2}
     .lr-restore{font-size:10px;padding:4px 9px}
     .lr-log-views{gap:5px}
     .lr-view-btn{font-size:10px;padding:4px 9px}
@@ -605,18 +621,22 @@ const css = `
   .ai-img-label{font-family:'DejaVu Sans Mono',monospace;font-size:7px;letter-spacing:1.5px;color:#4a7a9b;text-transform:uppercase;text-align:center;margin-top:5px;opacity:.7}
 `;
 
-const SWIPE_W = 168;   // Archive + Delete, 84px each
+const SWIPE_W = 96;   // one action per view — see swipeAction in App
 
-// One flex line on both platforms: dot, tier, name, time, chevron.
+// One row shape on both platforms, two lines: dot / tier / name / time / chevron,
+// then the problem title beneath on its own line. order:1 + flex-basis:100% on
+// .lr-log-problem does the wrapping, so the markup is identical everywhere and
+// only the type scale is per-platform.
 // The dot stays hidden on mobile — the 4px --tier edge bar already carries the
-// colour there, and a second marker 11px away costs ~15px of a tight 375px row.
-function CallLogItem({ call, isActive, expanded, rowId, onClick, swipeActions, onRestore }) {
+// colour there, and a second marker 11px away would encode the tier twice.
+function CallLogItem({ call, isActive, expanded, rowId, onClick, swipeAction, onRestore }) {
   const tier = call.report_json?.priority?.tier || "Standard";
   const dot = TIER_DOT_COLORS[tier] || "#82a0ba";
+  const problem = call.report_json?.problem?.title || "";
   const [dx, setDx] = useState(0);
   const openRef = React.useRef(false);
   const drag = React.useRef(null);
-  const swipeOn = !!swipeActions;
+  const swipeOn = !!swipeAction;
 
   // touch-action:pan-y on the row lets the browser keep vertical scrolling
   // while handing us horizontal gestures, so no preventDefault is needed and
@@ -653,11 +673,14 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick, swipeActions, o
   return (
     <div className="lr-swipe">
       {swipeOn && (
-        <div className="lr-swipe-actions" aria-hidden={dx === 0}>
-          <button type="button" className="lr-swipe-btn arch" tabIndex={dx === 0 ? -1 : 0}
-            onClick={e => {e.stopPropagation(); run(swipeActions.onArchive);}}>Archive</button>
-          <button type="button" className="lr-swipe-btn del" tabIndex={dx === 0 ? -1 : 0}
-            onClick={e => {e.stopPropagation(); run(swipeActions.onDelete);}}>Delete</button>
+        // hidden and untappable until the row is actually displaced — an .active
+        // row's tint is not fully opaque, so anything still painted here shows
+        // through it and, sitting underneath, steals the tap without acting
+        <div className="lr-swipe-actions" aria-hidden={dx === 0}
+          style={{visibility: dx ? "visible" : "hidden", pointerEvents: dx ? "auto" : "none"}}>
+          <button type="button" className={`lr-swipe-btn ${swipeAction.cls}`}
+            tabIndex={dx === 0 ? -1 : 0}
+            onClick={e => {e.stopPropagation(); run(swipeAction.run);}}>{swipeAction.label}</button>
         </div>
       )}
       <div id={rowId} className={`lr-log-item${isActive?" active":""}${expanded?" open":""}`}
@@ -672,6 +695,7 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick, swipeActions, o
         <span className="lr-log-tier lr-mono"
           style={{color:dot,background:`rgba(${hexToRgb(dot)},.15)`}}>{tier}</span>
         <span className="lr-log-name lr-mono">{call.caller_name||"Unknown"}</span>
+        {problem && <span className="lr-log-problem">{problem}</span>}
         <span className="lr-log-time lr-mono">{fmtTime(call.created_at)}</span>
         {onRestore && (
           <button type="button" className="lr-restore lr-mono"
@@ -694,9 +718,10 @@ const EMPTY_VIEW = { log:"No calls in the log.", archive:"Nothing archived.", tr
 //  - default (desktop sidebar): rows select, the report lives in its own pane
 //  - accordion (mobile): rows toggle, the report renders inline under the open row
 function CallLog({ calls, selectedId, onSelect, accordion=false, expandedId=null, onToggle, rptNum,
-                   view="log", onViewChange, swipeActions, onRestore }) {
+                   view="log", onViewChange, swipeAction, onRestore, onEmptyTrash }) {
   // date label -> bool. Absent = use the default (Today open, everything else collapsed).
   const [openOverrides, setOpenOverrides] = useState({});
+  const [confirmEmpty, setConfirmEmpty] = useState(false);
   const currentId = accordion ? expandedId : selectedId;
 
   const groups = [];
@@ -722,6 +747,24 @@ function CallLog({ calls, selectedId, onSelect, accordion=false, expandedId=null
           </div>
         )}
       </div>
+      {view === "trash" && calls.length > 0 && (
+        <div className="lr-trash-bar">
+          {confirmEmpty ? (
+            <>
+              <span className="lr-trash-warn lr-mono">
+                Permanently delete {calls.length} report{calls.length!==1?"s":""}? This cannot be undone.
+              </span>
+              <button type="button" className="lr-view-btn lr-mono danger"
+                onClick={()=>{setConfirmEmpty(false); onEmptyTrash && onEmptyTrash();}}>Delete forever</button>
+              <button type="button" className="lr-view-btn lr-mono"
+                onClick={()=>setConfirmEmpty(false)}>Cancel</button>
+            </>
+          ) : (
+            <button type="button" className="lr-view-btn lr-mono"
+              onClick={()=>setConfirmEmpty(true)}>Empty trash</button>
+          )}
+        </div>
+      )}
       {calls.length === 0 && <div className="lr-log-none lr-mono">{EMPTY_VIEW[view]}</div>}
       {groups.map(([date, items]) => {
         const hasCurrent = items.some(c => c.id === currentId);
@@ -757,7 +800,7 @@ function CallLog({ calls, selectedId, onSelect, accordion=false, expandedId=null
                 <React.Fragment key={c.id}>
                   <CallLogItem
                     call={c}
-                    swipeActions={accordion ? swipeActions : null}
+                    swipeAction={accordion ? swipeAction : null}
                     onRestore={onRestore}
                     isActive={isCurrent}
                     expanded={accordion && isCurrent}
@@ -1128,6 +1171,28 @@ export default function App() {
   const deleteCall  = React.useCallback(c => patchCall(c, {deleted_at:  new Date().toISOString()}), [patchCall]);
   const restoreCall = React.useCallback(c => patchCall(c, view==="trash" ? {deleted_at:null} : {archived_at:null}), [patchCall, view]);
 
+  // The only hard delete in the app. Everything else is a timestamp that can be
+  // nulled again; this removes the rows. Guarded by a confirm in the trash bar.
+  const emptyTrash = React.useCallback(() => {
+    const before = calls;
+    if (!calls.some(c => c.deleted_at)) return;
+    setCalls(cs => cs.filter(c => !c.deleted_at));
+    fetch(`https://xofgjzfofmjziycqprhq.supabase.co/rest/v1/calls?client_id=eq.${encodeURIComponent(clientId)}&deleted_at=not.is.null`, {
+      method: "DELETE",
+      cache: "no-store",
+      headers: {apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}`, Prefer: "return=minimal"}
+    })
+    .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); })
+    .catch(() => { setCalls(before); });
+  }, [calls, clientId]);
+
+  // one action per view: archive out of the log, delete out of the archive,
+  // nothing in the trash — its only exits are Restore and Empty trash
+  const swipeAction =
+      view === "log"     ? {label:"Archive", cls:"arch", run:archiveCall}
+    : view === "archive" ? {label:"Delete",  cls:"del",  run:deleteCall}
+    : null;
+
   const loadCalls = React.useCallback(() => {
     // No tenant, no request.
     if (!clientId) { setStatus("no-client"); return; }
@@ -1212,7 +1277,7 @@ export default function App() {
         <BrandLockup uid="sidebar"/>
       </div>
       <CallLog calls={visibleCalls} selectedId={selected?.id} view={view} onViewChange={setView}
-        onRestore={view==="log" ? null : restoreCall}
+        onRestore={view==="log" ? null : restoreCall} onEmptyTrash={emptyTrash}
         onSelect={c=>{setSelected(c);window.scrollTo&&window.scrollTo({top:0,behavior:"smooth"})}}/>
     </>
   );
@@ -1258,8 +1323,9 @@ export default function App() {
           ? <div className="lr-mobile-state">{stateCard}</div>
           : <CallLog calls={visibleCalls} accordion expandedId={mobileOpenId}
               view={view} onViewChange={setView}
-              swipeActions={view==="log" ? {onArchive:archiveCall, onDelete:deleteCall} : null}
+              swipeAction={swipeAction}
               onRestore={view==="log" ? null : restoreCall}
+              onEmptyTrash={emptyTrash}
               onToggle={toggleMobile} rptNum={rptNum}/>}
       </div>
 
