@@ -29,6 +29,8 @@ const TIER_COLORS = {
   Quote:     { border:"#4a7a65", bg:"rgba(74,122,101,.1)",  dot:"#4a7a65", text:"#7fad95" }
 };
 
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvZmdqemZvZm1qeml5Y3FwcmhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NDI1MDcsImV4cCI6MjA5NzMxODUwN30.qdn-YSphrwgMee0vdpPgE1RudBw0Z-zKOBPXmnZ4aY8";
+
 const TIER_DOT_COLORS = { Emergency:"#dc5b4e", Urgent:"#e2884a", Standard:"#378add", Quote:"#4a7a65" };
 
 function isDayActive(dayKey, days) {
@@ -42,15 +44,6 @@ function isDayActive(dayKey, days) {
     return ld === lk || ld.startsWith(lk) || lk.startsWith(ld);
   });
 }
-
-// Words safe to drop from the end of a cut phrase — a summary ending in
-// "into the" reads as broken, one ending in "ceiling" reads as complete.
-const DANGLING_WORDS = new Set([
-  "the","a","an","and","or","but","in","on","at","to","of","for","with",
-  "into","from","over","under","by","is","are","was","has","had","their",
-  "this","that","its","getting","being","be","been","will","would","can",
-  "could","should","near","about","very","really"
-]);
 
 // The priority column exists to justify the tier — why THIS call is Urgent
 // rather than Standard. When the generator fills priority.reason with a
@@ -105,93 +98,6 @@ function fallbackJustification(d) {
     `${d?.problem?.title || ""} ${d?.problem?.detail || ""}`));
   if (problemWords.size && restatesProblem(clause, problemWords)) return "";
   return clause;
-}
-
-// Where a sentence can be cut and still read as a finished thought: the end
-// of a sentence or clause, or just before a word that opens a new one. A cut
-// anywhere else ("…researching pricing and founder") leaves the reader hanging
-// mid-idea, which is what makes a shortened line feel truncated even when no
-// character is visibly missing.
-const CLAUSE_OPENERS = /\s+(?:who|whom|whose|which|that|because|since|while|before|after|until|when|where|so|but|and|or|though|although|unless|with|without|plus|then|as)\s+/gi;
-
-// Trailing scraps that add nothing on their own: "…asked for pricing, got it"
-// is a grammatically complete sentence that still reads like it trailed off,
-// because the last clause carries no information. Dropping it leaves a line
-// that both reads finished and says something.
-const WEAK_TAIL_WORDS = new Set([
-  "got","it","that","this","them","they","those","these","one","ones","so",
-  "too","also","well","done","did","same","such","there","here","now","then",
-  "as","and","but","which","who"
-]);
-
-function trimWeakTail(text) {
-  const parts = text.split(/\s*[,—–]\s*/);
-  if (parts.length < 2) return text;
-  const last = parts[parts.length - 1].trim();
-  const words = last.split(/\s+/);
-  if (words.length <= 3 && words.every(w => WEAK_TAIL_WORDS.has(w.toLowerCase().replace(/[^a-z]/g, "")))) {
-    const cutAt = text.lastIndexOf(parts[parts.length - 1]);
-    const trimmed = text.slice(0, cutAt).replace(/[\s,—–-]+$/, "");
-    if (trimmed.length >= 12) return trimmed;
-  }
-  return text;
-}
-
-function clauseCuts(text) {
-  const cuts = [];
-  const punctuation = /[.;:!?]|\s+[—–]\s+|,/g;
-  let m;
-  while ((m = punctuation.exec(text)) !== null) cuts.push(m.index);
-  CLAUSE_OPENERS.lastIndex = 0;
-  while ((m = CLAUSE_OPENERS.exec(text)) !== null) {
-    cuts.push(m.index);
-    CLAUSE_OPENERS.lastIndex = m.index + 1;   // allow overlapping matches
-  }
-  return cuts.sort((a, b) => a - b);
-}
-
-// Shorten to something that reads as a complete thought rather than a cut-off
-// one. Priority reasons come through in two shapes: "·"-joined fragments and
-// ordinary prose sentences. Fragments keep whole segments; prose keeps the
-// longest leading clause that fits, so "This is a warm inbound prospect who
-// already uses a competitor" becomes "This is a warm inbound prospect" instead
-// of stopping mid-clause. No ellipsis — a visible "…" reads as truncation to
-// the person triaging. Full text stays in the report and the title attribute.
-function summarizeReason(reason, maxChars) {
-  if (!reason) return "";
-  // an informationless tail reads as trailing off whether the generator wrote
-  // it that way or a clause cut landed there, so strip it in both cases
-  if (reason.length <= maxChars) return trimWeakTail(reason);
-
-  if (reason.includes("·")) {
-    const segs = reason.split("·").map(s => s.trim()).filter(Boolean);
-    let out = "";
-    for (const seg of segs) {
-      const next = out ? `${out} · ${seg}` : seg;
-      if (next.length > maxChars) break;
-      out = next;
-    }
-    if (out) return out;
-  }
-
-  // longest leading clause that fits — the most information that still lands
-  // on a natural stopping point
-  const fitting = clauseCuts(reason).filter(i => i > 0 && i <= maxChars);
-  if (fitting.length) {
-    const clause = reason.slice(0, fitting[fitting.length - 1]).trim()
-      .replace(/[,;:—–-]+$/, "").trim();
-    if (clause.length >= 12) return trimWeakTail(clause);
-  }
-
-  // no natural break in range: cut at a word boundary and drop trailing
-  // connectives so the phrase at least doesn't end mid-thought
-  const cut = reason.slice(0, maxChars);
-  const sp = cut.lastIndexOf(" ");
-  const words = (sp > maxChars * 0.6 ? cut.slice(0, sp) : cut).trimEnd().split(/\s+/);
-  while (words.length > 1 && DANGLING_WORDS.has(words[words.length - 1].toLowerCase())) {
-    words.pop();
-  }
-  return words.join(" ");
 }
 
 function hexToRgb(hex) {
@@ -416,21 +322,36 @@ const css = `
   .lr-log-caret{display:inline-block;font-size:7px;color:#56697b;transform:rotate(0deg);transition:transform .18s ease;flex-shrink:0}
   .lr-log-caret.open{transform:rotate(90deg)}
   .lr-log-count{margin-left:auto;font-size:8px;letter-spacing:1px;color:#56697b;flex-shrink:0}
-  .lr-log-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #21303b;border-radius:3px;background:#141d25;margin-bottom:4px;cursor:pointer;transition:border-color .15s}
+  .lr-log-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #21303b;border-radius:3px;background:#141d25;margin-bottom:4px;cursor:pointer;transition:border-color .15s}
   .lr-log-item:hover{border-color:#2b3a47}
   .lr-log-item.active{border-color:#c89456;background:rgba(200,148,86,.06)}
   .lr-log-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
   .lr-log-name{font-size:11px;color:#eef3f7;font-weight:500;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .lr-log-problem{font-size:10px;color:#aebfcc;flex:1.2;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .lr-log-time{font-size:9px;color:#56697b;flex-shrink:0}
-  /* Inert on desktop: display:contents keeps the sidebar row a single flex
-     line of dot / name / problem / time / chevron, exactly as before. */
-  .lr-log-main{display:contents}
-  .lr-log-lbl{display:none}
-  .lr-log-pri{display:none}
-  .lr-log-tier{display:none}
-  .lr-log-reason{display:none}
+  /* tier word, styled as the pill: colour at full strength on itself at 15%,
+     both set inline from TIER_DOT_COLORS. nowrap so EMERGENCY never breaks. */
+  .lr-log-tier{flex-shrink:0;white-space:nowrap;font-size:7.5px;letter-spacing:.08em;
+    font-weight:600;text-transform:uppercase;line-height:1.2;padding:3px 6px;border-radius:3px}
   .lr-log-chevron{font-size:10px;color:#56697b;flex-shrink:0}
+  /* swipe shell — inert on desktop, which gets no swipe actions this pass */
+  .lr-swipe{display:contents}
+  .lr-swipe-actions{display:none}
+  .lr-swipe-btn{border:none;font-family:'DejaVu Sans Mono','Liberation Mono',monospace;
+    font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#eef3f7;cursor:pointer}
+  .lr-swipe-btn.arch{background:#2b3a47}
+  .lr-swipe-btn.del{background:#a33f35}
+  .lr-restore{flex-shrink:0;background:none;border:1px solid #378add;color:#378add;
+    font-size:8px;letter-spacing:1px;text-transform:uppercase;padding:3px 7px;
+    border-radius:3px;cursor:pointer}
+  .lr-restore:hover{background:rgba(55,138,221,.12)}
+  /* view switcher lives in the log's own header row */
+  .lr-log-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+  .lr-log-head .lr-log-label{margin-bottom:0}
+  .lr-log-views{display:flex;gap:4px;flex-shrink:0}
+  .lr-view-btn{background:none;border:1px solid #21303b;color:#56697b;font-size:8px;
+    letter-spacing:1px;text-transform:uppercase;padding:3px 7px;border-radius:2px;cursor:pointer}
+  .lr-view-btn.on{border-color:#c89456;color:#e6b074;background:rgba(200,148,86,.08)}
+  .lr-log-none{font-size:11px;color:#56697b;padding:10px 2px}
   .lr-empty-title{font-size:15px;color:#eef3f7;font-weight:600;margin-bottom:6px}
   .lr-empty-body{font-size:12px;color:#82a0ba;line-height:1.5;max-width:340px}
   .lr-report{padding:0 16px 32px}
@@ -454,7 +375,10 @@ const css = `
   .lr-day.on{background:rgba(200,148,86,.2);border-color:#c89456}
   .lr-day.on .dl{color:#e6b074}
   .lr-tier{display:flex;align-items:center;gap:6px;padding:3px 7px;border-radius:3px;border:1px solid #21303b;background:#0d141b;opacity:.35;margin-bottom:3px}
-  .lr-tier.active{opacity:1;border-left-width:3px}
+  .lr-tier.active{opacity:1;border-left-width:3px;padding:7px 9px;align-items:flex-start}
+  .lr-tier.active .tdot{margin-top:4px}
+  .lr-tier.active .tn{font-size:9px}
+  .lr-tier.active .tr{font-size:10.5px;line-height:1.45}
   .lr-tier .tdot{width:5px;height:5px;border-radius:50%;flex-shrink:0;background:#21303b}
   .lr-tier .tn{font-size:7.5px;letter-spacing:1.5px;font-weight:700;text-transform:uppercase;color:#56697b}
   .lr-tier .tr{font-size:7.5px;color:#aebfcc}
@@ -493,7 +417,7 @@ const css = `
      only takes effect once they stop being display:contents. */
   .rpt-lead-section,.rpt-story-section{display:contents}
   @media(min-width:768px){
-    .lr-layout{display:grid;grid-template-columns:300px 1fr;min-height:100vh}
+    .lr-layout{display:grid;grid-template-columns:280px 1fr;min-height:100vh}
     .lr-sidebar{border-right:1px solid #21303b;background:#0d141b;overflow-y:auto;height:100vh;position:sticky;top:0}
     .lr-main{overflow-y:auto}
     .lr-nav{display:none}
@@ -547,6 +471,8 @@ const css = `
     .lr-log-label{font-size:11px}
     .lr-tier .tn{font-size:10px}
     .lr-tier .tr{font-size:10px}
+    .lr-tier.active .tn{font-size:11.5px}
+    .lr-tier.active .tr{font-size:13px;line-height:1.45}
     .lr-day{width:26px;height:26px}
     .lr-day .dl{font-size:10px}
     .ai-img-label{font-size:9px}
@@ -649,31 +575,26 @@ const css = `
     @media(prefers-reduced-motion:reduce){
       .lr-log-group-hdr:active,.lr-log-item:active{transform:none}
     }
-    .lr-log-item{display:flex;align-items:center;gap:10px;position:relative;
-      padding:11px 26px 11px 14px;margin-bottom:6px}
-    .lr-log-main{display:block;flex:1 1 auto;min-width:0}
-    .lr-log-lbl{display:block;font-size:9px;letter-spacing:1px;color:#56697b;
-      text-transform:uppercase;line-height:1;margin-bottom:3px}
-    /* priority: right column, centred stack — tier pill over its reason.
-       ~45% so the reason has room to wrap instead of being clipped to a stub. */
-    .lr-log-pri{display:flex;flex-direction:column;align-items:center;justify-content:center;
-      gap:6px;flex:0 0 45%;max-width:45%;margin-left:4px;text-align:center}
-    /* pill: tier colour at full strength on the same colour at 15%, both set
-       inline from TIER_DOT_COLORS */
-    .lr-log-tier{display:inline-block;font-size:11px;letter-spacing:.08em;font-weight:500;
-      text-transform:uppercase;line-height:1.2;padding:4px 10px;border-radius:4px}
-    /* max-height caps the clamp: with a centred flex parent some engines let a
-       -webkit-box grow past its line-clamp when the row is tall enough. The
-       +3px buffer keeps rounding from vertically slicing the third line. */
-    .lr-log-reason{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;
-      overflow:hidden;width:100%;text-align:center;font-size:12px;color:#82a0ba;
-      line-height:1.35;white-space:normal;overflow-wrap:break-word;
-      max-height:calc(12px * 1.35 * 4 + 3px)}
+    /* the swipe shell owns the row's spacing and clips the action panel */
+    .lr-swipe{display:block;position:relative;overflow:hidden;border-radius:3px;margin-bottom:6px}
+    .lr-swipe-actions{display:flex;position:absolute;top:0;right:0;bottom:0;width:168px}
+    .lr-swipe-btn{flex:1}
+    /* pan-y keeps vertical scrolling with the browser and hands us the
+       horizontal gesture, so the drag needs no preventDefault */
+    .lr-log-item{display:flex;align-items:center;gap:9px;position:relative;
+      padding:12px 26px 12px 14px;margin-bottom:0;touch-action:pan-y}
     .lr-log-item::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:2px 0 0 2px;background:var(--tier,#82a0ba)}
+    /* the edge bar already carries the tier colour here — see the note on
+       CallLogItem for why the dot stays hidden on a phone */
     .lr-log-dot{display:none}
-    .lr-log-name{display:block;font-size:15px;font-weight:600;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.25;margin-bottom:8px}
-    .lr-log-problem{display:block;font-size:13px;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.35;margin-bottom:8px}
-    .lr-log-time{display:block;font-size:11px;line-height:1.2}
+    .lr-log-tier{font-size:10px;padding:4px 9px;border-radius:4px}
+    .lr-log-name{flex:1;min-width:0;font-size:14px;font-weight:600;white-space:nowrap;
+      overflow:hidden;text-overflow:ellipsis;line-height:1.25}
+    .lr-log-time{font-size:11px;line-height:1.2;flex-shrink:0}
+    .lr-restore{font-size:10px;padding:4px 9px}
+    .lr-log-views{gap:5px}
+    .lr-view-btn{font-size:10px;padding:4px 9px}
+    .lr-log-none{font-size:13px}
     .lr-log-chevron{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:15px;transition:transform .18s ease}
   }
   .gen-btn{background:rgba(200,148,86,.12);border:1px solid #c89456;color:#e6b074;font-family:monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:6px 14px;border-radius:2px;cursor:pointer}
@@ -684,54 +605,96 @@ const css = `
   .ai-img-label{font-family:'DejaVu Sans Mono',monospace;font-size:7px;letter-spacing:1.5px;color:#4a7a9b;text-transform:uppercase;text-align:center;margin-top:5px;opacity:.7}
 `;
 
-function CallLogItem({ call, isActive, expanded, rowId, onClick }) {
+const SWIPE_W = 168;   // Archive + Delete, 84px each
+
+// One flex line on both platforms: dot, tier, name, time, chevron.
+// The dot stays hidden on mobile — the 4px --tier edge bar already carries the
+// colour there, and a second marker 11px away costs ~15px of a tight 375px row.
+function CallLogItem({ call, isActive, expanded, rowId, onClick, swipeActions, onRestore }) {
   const tier = call.report_json?.priority?.tier || "Standard";
   const dot = TIER_DOT_COLORS[tier] || "#82a0ba";
-  const problem = call.report_json?.problem?.title || "Unknown";
-  const d = call.report_json || {};
-  const fullReason = d.priority?.reason || "";
-  // Show why this tier was chosen, not the problem again — the problem
-  // already owns the column to the left. Anything the reason shares with it
-  // is dropped; if that empties the field, the dispatch note's urgency
-  // clause stands in, since it explains the same decision.
-  // a segment that was mid-string ("… · elderly resident") leads the box once
-  // the parts before it are dropped, so it needs a capital to read as a phrase
-  const justification = (distinctReason(fullReason, d.problem) || fallbackJustification(d))
-    .replace(/^[a-z]/, c => c.toUpperCase());
-  // The column is 45% of the row; on a narrow phone that's ~17 chars per 12px
-  // line. The left column (caller / reason / received) always runs taller than
-  // this one, so a 4th line costs no row height and buys ~65 chars — enough
-  // for a whole opening clause rather than a fragment of one.
-  const reason = summarizeReason(justification, 65);
+  const [dx, setDx] = useState(0);
+  const openRef = React.useRef(false);
+  const drag = React.useRef(null);
+  const swipeOn = !!swipeActions;
+
+  // touch-action:pan-y on the row lets the browser keep vertical scrolling
+  // while handing us horizontal gestures, so no preventDefault is needed and
+  // React's passive listeners are fine.
+  function onTouchStart(e) {
+    if (!swipeOn) return;
+    const t = e.touches[0];
+    drag.current = {x:t.clientX, y:t.clientY, axis:null, base: openRef.current ? -SWIPE_W : 0};
+  }
+  function onTouchMove(e) {
+    const s0 = drag.current; if (!s0) return;
+    const t = e.touches[0], mx = t.clientX - s0.x, my = t.clientY - s0.y;
+    if (!s0.axis) {
+      if (Math.abs(mx) < 6 && Math.abs(my) < 6) return;      // below the slop threshold
+      s0.axis = Math.abs(mx) > Math.abs(my) ? "x" : "y";
+    }
+    if (s0.axis !== "x") return;
+    setDx(Math.max(-SWIPE_W, Math.min(0, s0.base + mx)));
+  }
+  function onTouchEnd() {
+    const s0 = drag.current; drag.current = null;
+    if (!s0 || s0.axis !== "x") return;
+    const willOpen = dx < -SWIPE_W / 2;
+    openRef.current = willOpen;
+    setDx(willOpen ? -SWIPE_W : 0);
+  }
+  function handleClick() {
+    // a swiped-open row absorbs the tap: close it rather than expanding
+    if (openRef.current || dx !== 0) { openRef.current = false; setDx(0); return; }
+    onClick();
+  }
+  function run(fn) { openRef.current = false; setDx(0); fn(call); }
+
   return (
-    <div id={rowId} className={`lr-log-item${isActive?" active":""}${expanded?" open":""}`}
-      style={{"--tier":dot}} onClick={onClick}
-      role={rowId?"button":undefined} aria-expanded={rowId?!!expanded:undefined}>
-      <span className="lr-log-dot" style={{background:dot,boxShadow:isActive?`0 0 5px ${dot}`:undefined}}/>
-      {/* display:contents on desktop, so the sidebar row stays the same flex line */}
-      <div className="lr-log-main">
-        <span className="lr-log-lbl lr-mono">Caller</span>
-        <span className="lr-log-name lr-mono">{call.caller_name||"Unknown"}</span>
-        <span className="lr-log-lbl lr-mono">Reason for call</span>
-        <span className="lr-log-problem">{problem}</span>
-        <span className="lr-log-lbl lr-mono">Received</span>
-        <span className="lr-log-time lr-mono">{fmtTime(call.created_at)}</span>
-      </div>
-      {/* mobile only — priority pulled out to the right of the row */}
-      <div className="lr-log-pri">
+    <div className="lr-swipe">
+      {swipeOn && (
+        <div className="lr-swipe-actions" aria-hidden={dx === 0}>
+          <button type="button" className="lr-swipe-btn arch" tabIndex={dx === 0 ? -1 : 0}
+            onClick={e => {e.stopPropagation(); run(swipeActions.onArchive);}}>Archive</button>
+          <button type="button" className="lr-swipe-btn del" tabIndex={dx === 0 ? -1 : 0}
+            onClick={e => {e.stopPropagation(); run(swipeActions.onDelete);}}>Delete</button>
+        </div>
+      )}
+      <div id={rowId} className={`lr-log-item${isActive?" active":""}${expanded?" open":""}`}
+        style={{"--tier":dot,
+                transform: dx ? `translateX(${dx}px)` : undefined,
+                transition: drag.current ? "none" : "transform .18s ease"}}
+        onClick={handleClick}
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}
+        role={rowId?"button":undefined} aria-expanded={rowId?!!expanded:undefined}>
+        <span className="lr-log-dot" style={{background:dot,boxShadow:isActive?`0 0 5px ${dot}`:undefined}}/>
         <span className="lr-log-tier lr-mono"
           style={{color:dot,background:`rgba(${hexToRgb(dot)},.15)`}}>{tier}</span>
-        {reason && <span className="lr-log-reason" title={fullReason}>{reason}</span>}
+        <span className="lr-log-name lr-mono">{call.caller_name||"Unknown"}</span>
+        <span className="lr-log-time lr-mono">{fmtTime(call.created_at)}</span>
+        {onRestore && (
+          <button type="button" className="lr-restore lr-mono"
+            onClick={e => {e.stopPropagation(); onRestore(call);}}>Restore</button>
+        )}
+        <span className="lr-log-chevron">›</span>
       </div>
-      <span className="lr-log-chevron">›</span>
     </div>
   );
 }
+const LOG_VIEWS = [["log","Log"],["archive","Archive"],["trash","Trash"]];
+const LOG_LABEL = {
+  log:     n => `${n} rescued call${n!==1?"s":""}`,
+  archive: n => `${n} archived`,
+  trash:   n => `${n} in trash`
+};
+const EMPTY_VIEW = { log:"No calls in the log.", archive:"Nothing archived.", trash:"Trash is empty." };
 
 // Two modes, one component so the grouping and day-collapse logic stays shared:
 //  - default (desktop sidebar): rows select, the report lives in its own pane
 //  - accordion (mobile): rows toggle, the report renders inline under the open row
-function CallLog({ calls, selectedId, onSelect, accordion=false, expandedId=null, onToggle, rptNum }) {
+function CallLog({ calls, selectedId, onSelect, accordion=false, expandedId=null, onToggle, rptNum,
+                   view="log", onViewChange, swipeActions, onRestore }) {
   // date label -> bool. Absent = use the default (Today open, everything else collapsed).
   const [openOverrides, setOpenOverrides] = useState({});
   const currentId = accordion ? expandedId : selectedId;
@@ -746,7 +709,20 @@ function CallLog({ calls, selectedId, onSelect, accordion=false, expandedId=null
 
   return (
     <div className="lr-log">
-      <div className="lr-log-label lr-mono">{calls.length} rescued call{calls.length!==1?"s":""}</div>
+      <div className="lr-log-head">
+        <div className="lr-log-label lr-mono">{LOG_LABEL[view](calls.length)}</div>
+        {onViewChange && (
+          <div className="lr-log-views">
+            {LOG_VIEWS.map(([key,label]) => (
+              <button key={key} type="button"
+                className={`lr-view-btn lr-mono${view===key?" on":""}`}
+                aria-pressed={view===key}
+                onClick={()=>onViewChange(key)}>{label}</button>
+            ))}
+          </div>
+        )}
+      </div>
+      {calls.length === 0 && <div className="lr-log-none lr-mono">{EMPTY_VIEW[view]}</div>}
       {groups.map(([date, items]) => {
         const hasCurrent = items.some(c => c.id === currentId);
         const userOpen = openOverrides[date] !== undefined ? openOverrides[date] : date === "Today";
@@ -781,6 +757,8 @@ function CallLog({ calls, selectedId, onSelect, accordion=false, expandedId=null
                 <React.Fragment key={c.id}>
                   <CallLogItem
                     call={c}
+                    swipeActions={accordion ? swipeActions : null}
+                    onRestore={onRestore}
                     isActive={isCurrent}
                     expanded={accordion && isCurrent}
                     // id only in accordion mode — the desktop log renders the same
@@ -1086,6 +1064,8 @@ export default function App() {
   ).current;
   // mobile accordion: which call is expanded inline (null = all collapsed)
   const [mobileOpenId, setMobileOpenId] = useState(null);
+  // "log" | "archive" | "trash" — archived_at / deleted_at drive the split
+  const [view, setView] = useState("log");
   const scrollTargetId = React.useRef(null);
   const rptNum = React.useRef(Math.floor(Math.random()*9000)+1000).current;
 
@@ -1120,6 +1100,34 @@ export default function App() {
     });
   }, [mobileOpenId]);
 
+  // Soft archive/delete/restore. Optimistic in state, reverted if the PATCH
+  // fails — nothing is destroyed, both columns are timestamps that can be
+  // nulled again from the Archive and Trash views.
+  const patchCall = React.useCallback((call, patch) => {
+    const before = call;
+    setCalls(cs => cs.map(c => c.id===call.id ? {...c, ...patch} : c));
+    // the row is leaving whichever view we are in, so drop any selection on it
+    setSelected(sel => sel && sel.id===call.id ? null : sel);
+    setMobileOpenId(id => id===call.id ? null : id);
+    fetch(`https://xofgjzfofmjziycqprhq.supabase.co/rest/v1/calls?id=eq.${call.id}`, {
+      method: "PATCH",
+      cache: "no-store",
+      headers: {
+        apikey: SUPABASE_ANON,
+        Authorization: `Bearer ${SUPABASE_ANON}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal"
+      },
+      body: JSON.stringify(patch)
+    })
+    .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); })
+    .catch(() => { setCalls(cs => cs.map(c => c.id===call.id ? before : c)); });
+  }, []);
+
+  const archiveCall = React.useCallback(c => patchCall(c, {archived_at: new Date().toISOString()}), [patchCall]);
+  const deleteCall  = React.useCallback(c => patchCall(c, {deleted_at:  new Date().toISOString()}), [patchCall]);
+  const restoreCall = React.useCallback(c => patchCall(c, view==="trash" ? {deleted_at:null} : {archived_at:null}), [patchCall, view]);
+
   const loadCalls = React.useCallback(() => {
     // No tenant, no request.
     if (!clientId) { setStatus("no-client"); return; }
@@ -1133,8 +1141,8 @@ export default function App() {
       signal: ctl.signal,
       cache: "no-store",              // iOS Safari serves stale cached failures aggressively
       headers: {
-        apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvZmdqemZvZm1qeml5Y3FwcmhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NDI1MDcsImV4cCI6MjA5NzMxODUwN30.qdn-YSphrwgMee0vdpPgE1RudBw0Z-zKOBPXmnZ4aY8",
-        Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvZmdqemZvZm1qeml5Y3FwcmhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NDI1MDcsImV4cCI6MjA5NzMxODUwN30.qdn-YSphrwgMee0vdpPgE1RudBw0Z-zKOBPXmnZ4aY8`
+        apikey: SUPABASE_ANON,
+        Authorization: `Bearer ${SUPABASE_ANON}`
       }
     })
     .then(r => r.json().catch(() => null).then(body => ({ok: r.ok, http: r.status, body})))
@@ -1192,12 +1200,20 @@ export default function App() {
     </div>
   );
 
+  // archived and deleted rows leave the main log; each has its own view
+  const visibleCalls = calls.filter(c =>
+      view === "archive" ? !!c.archived_at
+    : view === "trash"   ? !!c.deleted_at
+    : !c.archived_at && !c.deleted_at);
+
   const sidebar = (
     <>
       <div className="lr-sidebar-nav">
         <BrandLockup uid="sidebar"/>
       </div>
-      <CallLog calls={calls} selectedId={selected?.id} onSelect={c=>{setSelected(c);window.scrollTo&&window.scrollTo({top:0,behavior:"smooth"})}}/>
+      <CallLog calls={visibleCalls} selectedId={selected?.id} view={view} onViewChange={setView}
+        onRestore={view==="log" ? null : restoreCall}
+        onSelect={c=>{setSelected(c);window.scrollTo&&window.scrollTo({top:0,behavior:"smooth"})}}/>
     </>
   );
 
@@ -1240,7 +1256,10 @@ export default function App() {
       <div className="lr-log-mobile">
         {stateCard
           ? <div className="lr-mobile-state">{stateCard}</div>
-          : <CallLog calls={calls} accordion expandedId={mobileOpenId}
+          : <CallLog calls={visibleCalls} accordion expandedId={mobileOpenId}
+              view={view} onViewChange={setView}
+              swipeActions={view==="log" ? {onArchive:archiveCall, onDelete:deleteCall} : null}
+              onRestore={view==="log" ? null : restoreCall}
               onToggle={toggleMobile} rptNum={rptNum}/>}
       </div>
 
