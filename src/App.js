@@ -102,6 +102,27 @@ function fallbackJustification(d) {
   return clause;
 }
 
+// The generator writes "Not provided" (and friends) rather than leaving a field
+// out, so an absent value has to be recognised as text, not as null.
+const NOT_PROVIDED = /^(not provided|not specified|n\/?a|none|unknown|null)$/i;
+function cleanField(v) {
+  const t = (v||"").trim();
+  return (!t || NOT_PROVIDED.test(t)) ? "" : t;
+}
+
+// The caller's own words about timing, trimmed to sit between mid-dots: no
+// trailing period, and cut at a word boundary if it runs long so it cannot
+// push the line to a second row on a narrow phone.
+function timingQuote(note, maxChars) {
+  let t = cleanField(note);
+  if (!t) return "";
+  t = t.replace(/[.\s]+$/, "");
+  if (t.length > maxChars) {
+    t = t.slice(0, maxChars).replace(/[\s,;:]+\S*$/, "").replace(/[\s,;:]+$/, "") + "…";
+  }
+  return t;
+}
+
 // "Call or text" / "Text" / "phone" -> "prefers call or text" / "prefers text".
 // Returns "" when the caller never said, so the mid-dot can be dropped with it.
 function prefersPhrase(pref) {
@@ -422,9 +443,18 @@ const css = `
     line-height:1.2;letter-spacing:.5px}
   /* Timing is a modifier on the number above it, not a peer — small, dim, one
      line, tucked close enough that the two read as a single block. */
-  .rpt-reach{display:flex;align-items:baseline;flex-wrap:wrap;gap:5px;margin-top:3px;
+  .rpt-reach{display:flex;align-items:baseline;flex-wrap:nowrap;gap:5px;margin-top:3px;
     font-size:10px;color:#82a0ba;line-height:1.3}
+  .rpt-reach > span{flex:0 0 auto}
   .rpt-reach-sep{color:#56697b}
+  /* The caller's wording is the only elastic part of the line: the parsed time
+     and the contact preference are short and fixed, so the quote takes whatever
+     width is left and ellipsises into it. That keeps the whole thing on one row
+     at 375px, where wrapping put it on four. The selector must outrank
+     ".rpt-reach > span" above, or the quote inherits flex-shrink:0 and pushes
+     the preference clean off the side of the screen. */
+  .rpt-reach > .rpt-reach-q{flex:0 1 auto;min-width:0;font-style:italic;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .box{background:#141d25;border:1px solid #21303b;border-radius:3px;padding:.75rem;margin-bottom:8px}
   .box:last-child{margin-bottom:0}
   .lr-day{width:18px;height:18px;border-radius:2px;display:flex;align-items:center;justify-content:center;border:1px solid #21303b;background:#0d141b}
@@ -1006,11 +1036,16 @@ function Report({ call, rptNum, imageUrl:imageOverride }) {
   const days = d.callback?.days || [];
   const dayCount = DAY_KEYS.filter(dk => isDayActive(dk, days)).length;
   const prefers = prefersPhrase(d.lead?.preferred_contact);
-  const addrLine2 = (d.lead?.address_line2||"").trim();
-  const hasLine2 = !!addrLine2 && !/^not provided$/i.test(addrLine2);
-  const addrParts = addrLine2.split(",");
-  const city = addrParts[0]?.trim()||"";
-  const stateZip = addrParts.slice(1).join(",").trim()||"";
+  // One address line, built from whatever actually exists. Three stacked lines
+  // left a ragged column with the width beside it empty, and an absent city or
+  // state used to leave a blank row or a dangling comma.
+  const addrParts = cleanField(d.lead?.address_line2).split(",");
+  const addrLine = [
+    cleanField(d.lead?.address_line1),
+    cleanField(addrParts[0]),
+    cleanField(addrParts.slice(1).join(","))
+  ].filter(Boolean).join(", ");
+  const quote = timingQuote(d.callback?.note, 40);
   const imageUrl = imageOverride ?? call.image_url ?? null;
 
   return (
@@ -1087,8 +1122,12 @@ function Report({ call, rptNum, imageUrl:imageOverride }) {
                   <Icon name="device-mobile" className="field-icon" style={{color:"#56697b"}}/>
                   <span className="rpt-phone lr-mono">{d.lead?.phone||"Not provided"}</span>
                 </div>
+                {/* parsed time, then the caller's own words, then how they want
+                    to be contacted — the order the question was actually asked in */}
                 <div className="rpt-reach lr-mono">
                   <span>{d.callback?.time||"Anytime"}</span>
+                  {quote && <span className="rpt-reach-sep">·</span>}
+                  {quote && <span className="rpt-reach-q">"{quote}"</span>}
                   {prefers && <span className="rpt-reach-sep">·</span>}
                   {prefers && <span>{prefers}</span>}
                 </div>
@@ -1109,12 +1148,7 @@ function Report({ call, rptNum, imageUrl:imageOverride }) {
                 <span className="field-lbl lr-mono">Service address</span>
                 <div style={{display:"flex",alignItems:"flex-start",gap:4}}>
                   <Icon name="map-pin" className="field-icon" style={{color:"#56697b",marginTop:1}}/>
-                  <div>
-                    <div className="field-val lr-mono">{d.lead?.address_line1||"Not provided"}</div>
-                    {/* an absent second line is blank space, not information */}
-                    {hasLine2 && <div className="field-val-dim lr-mono">{city}</div>}
-                    {hasLine2 && stateZip && <div className="field-val-dim lr-mono">{stateZip}</div>}
-                  </div>
+                  <div className="field-val lr-mono">{addrLine || "Not provided"}</div>
                 </div>
               </div>
             </div>
