@@ -29,6 +29,8 @@ const TIER_COLORS = {
   Quote:     { border:"#4a7a65", bg:"rgba(74,122,101,.1)",  dot:"#4a7a65", text:"#7fad95" }
 };
 
+const LIST_COLS = "id,created_at,caller_name,client_id,report_json,archived_at,deleted_at";
+
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvZmdqemZvZm1qeml5Y3FwcmhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NDI1MDcsImV4cCI6MjA5NzMxODUwN30.qdn-YSphrwgMee0vdpPgE1RudBw0Z-zKOBPXmnZ4aY8";
 
 const TIER_DOT_COLORS = { Emergency:"#dc5b4e", Urgent:"#e2884a", Standard:"#378add", Quote:"#4a7a65" };
@@ -98,6 +100,17 @@ function fallbackJustification(d) {
     `${d?.problem?.title || ""} ${d?.problem?.detail || ""}`));
   if (problemWords.size && restatesProblem(clause, problemWords)) return "";
   return clause;
+}
+
+// "Call or text" / "Text" / "phone" -> "prefers call or text" / "prefers text".
+// Returns "" when the caller never said, so the mid-dot can be dropped with it.
+function prefersPhrase(pref) {
+  const v = (pref||"").toLowerCase();
+  const call = /call|phone|voice/.test(v), text = /text|sms|message/.test(v);
+  if (call && text) return "prefers call or text";
+  if (text) return "prefers text";
+  if (call) return "prefers call";
+  return "";
 }
 
 function hexToRgb(hex) {
@@ -401,6 +414,12 @@ const css = `
   .field-val{font-size:clamp(9px,2.8vw,11px);color:#eef3f7;font-weight:500;line-height:1.35}
   .field-val-dim{font-size:clamp(9px,2.5vw,10px);color:#aebfcc;line-height:1.35}
   .div-h{border:none;border-top:1px solid #21303b;margin:.35rem 0}
+  /* time and preference on one line — the time carries the weight, the
+     preference trails it after a mid-dot */
+  .rpt-reach{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px;margin:1px 0 5px}
+  .rpt-reach-time{font-size:clamp(13px,3.6vw,16px);color:#e6b074;font-weight:700;line-height:1.15}
+  .rpt-reach-sep{color:#56697b;line-height:1.15}
+  .rpt-reach-pref{font-size:clamp(9px,2.4vw,10px);color:#aebfcc;letter-spacing:.5px;line-height:1.2}
   .box{background:#141d25;border:1px solid #21303b;border-radius:3px;padding:.75rem;margin-bottom:8px}
   .box:last-child{margin-bottom:0}
   .lr-day{width:18px;height:18px;border-radius:2px;display:flex;align-items:center;justify-content:center;border:1px solid #21303b;background:#0d141b}
@@ -461,11 +480,6 @@ const css = `
     .lr-card{margin-top:16px}
     .lr-pad{padding:20px}
     .report-grid{display:grid;grid-template-columns:1.5fr 1fr;gap:10px;align-items:start}
-    /* Inside the left box the callback window is another section of that card,
-       not a card sitting on a card — so it sheds the .box chrome and takes a
-       rule above it, the way the tone read and dispatch note are separated. */
-    .rpt-left > .rpt-callback{background:none;border:none;border-radius:0;padding:0;
-      margin-top:10px;padding-top:10px;border-top:1px solid #21303b}
     .report-right{display:flex;flex-direction:column;gap:8px}
     .lr-log-mobile{display:none}
   }
@@ -481,23 +495,20 @@ const css = `
     .rpt-left,.report-right{display:contents}
     .rpt-lead-section,.rpt-story-section{display:block;margin-bottom:0}
     /* One field per row on a phone. A 1fr column cannot shrink below its
-       content's min-content width, and a real email address ("vinny.test.
-       94630@rescuedcall.com") has no break opportunity — so in two columns it
-       pushed the second column off the screen entirely, taking Preferred
-       contact and How they found you with it. Full width fits the address,
-       and the labels stop wrapping into two lines as a bonus. */
+       content's min-content width, and a long unbroken value pushed the second
+       column off the screen entirely. Full width fits the address, and the
+       labels stop wrapping into two lines as a bonus. */
     .rpt-fields{grid-template-columns:1fr !important;gap:10px 0 !important}
+    .rpt-reach-time{font-size:17px}
+    .rpt-reach-pref{font-size:12px}
     /* belt and braces: a grid item defaults to min-width:auto, so without this
        a longer address than any seen so far could overflow again */
     .rpt-fields > div{min-width:0}
     .field-val,.field-val-dim{overflow-wrap:anywhere}
     .rpt-lead-section{border-left:3px solid var(--rpt-accent,#c89456);order:1}
     .rpt-priority{order:2}
-    /* mobile wants the callback window straight after Priority; desktop wants it
-       under the dispatch note. Same element, different slot per platform. */
-    .rpt-callback{order:3}
-    .rpt-story-section{order:4}
-    .rpt-problem{order:5}
+    .rpt-story-section{order:3}
+    .rpt-problem{order:4}
     /* separated the two halves inside one card; now they are two cards */
     .rpt-story-section > .div-h{display:none}
     .rpt-story-section > div{margin-top:0 !important}
@@ -753,7 +764,7 @@ const EMPTY_VIEW = { log:"No calls in the log.", archive:"Nothing archived.", tr
 //  - default (desktop sidebar): rows select, the report lives in its own pane
 //  - accordion (mobile): rows toggle, the report renders inline under the open row
 function CallLog({ calls, selectedId, onSelect, accordion=false, expandedId=null, onToggle, rptNum,
-                   view="log", onViewChange, onEmptyTrash, rowActions }) {
+                   view="log", onViewChange, onEmptyTrash, rowActions, images={} }) {
   // date label -> bool. Absent = use the default (Today open, everything else collapsed).
   const [openOverrides, setOpenOverrides] = useState({});
   const [confirmEmpty, setConfirmEmpty] = useState(false);
@@ -865,7 +876,7 @@ function CallLog({ calls, selectedId, onSelect, accordion=false, expandedId=null
                   />
                   {accordion && isCurrent && (
                     <div className="lr-inline-report">
-                      <Report call={c} rptNum={rptNum}/>
+                      <Report call={c} rptNum={rptNum} imageUrl={images[c.id]}/>
                     </div>
                   )}
                 </React.Fragment>
@@ -941,17 +952,19 @@ function LoadErrorState({ clientId, failure, onRetry }) {
   );
 }
 
-function Report({ call, rptNum }) {
+function Report({ call, rptNum, imageUrl:imageOverride }) {
   const d = call.report_json || {};
   const tier = d.priority?.tier || "Standard";
   const tc = TIER_COLORS[tier] || TIER_COLORS.Standard;
   const days = d.callback?.days || [];
+  const dayCount = DAY_KEYS.filter(dk => isDayActive(dk, days)).length;
+  const prefers = prefersPhrase(d.lead?.preferred_contact);
   const addrLine2 = (d.lead?.address_line2||"").trim();
   const hasLine2 = !!addrLine2 && !/^not provided$/i.test(addrLine2);
   const addrParts = addrLine2.split(",");
   const city = addrParts[0]?.trim()||"";
   const stateZip = addrParts.slice(1).join(",").trim()||"";
-  const imageUrl = call.image_url || null;
+  const imageUrl = imageOverride ?? call.image_url ?? null;
 
   return (
     <div className="lr-card" style={{"--rpt-accent":tc.border}}>
@@ -1020,7 +1033,6 @@ function Report({ call, rptNum }) {
             <div className="rpt-fields" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 12px",marginTop:".3rem",marginBottom:".6rem"}}>
               {[
                 {icon:"device-mobile",label:"Phone",val:d.lead?.phone},
-                {icon:"message-dots",label:"Preferred contact",val:d.lead?.preferred_contact},
               ].map(({icon,label,val})=>(
                 <div key={label}>
                   <span className="field-lbl lr-mono">{label}</span>
@@ -1030,6 +1042,33 @@ function Report({ call, rptNum }) {
                   </div>
                 </div>
               ))}
+              {/* Best time to reach — directly under Phone, since the two answer
+                  the same question: how and when to get back to this caller. The
+                  preferred contact method folds in here rather than standing as
+                  its own field saying "Call or text" with no timing attached. */}
+              <div className="rpt-callback" style={{gridColumn:"1 / -1"}}>
+                <span className="field-lbl lr-mono">Best time to reach</span>
+                <div className="rpt-reach">
+                  <span className="rpt-reach-time lr-mono">{d.callback?.time||"Anytime"}</span>
+                  {prefers && <span className="rpt-reach-sep">·</span>}
+                  {prefers && <span className="rpt-reach-pref lr-mono">{prefers}</span>}
+                </div>
+                {/* All seven lit says "any day", which is what no answer looks
+                    like — so the strip only earns its space when it narrows things. */}
+                {dayCount > 0 && dayCount < DAY_KEYS.length && (
+                  <div style={{display:"flex",gap:3,marginBottom:5}}>
+                    {DAY_KEYS.map((dk,i)=>{
+                      const on = isDayActive(dk,days);
+                      return <div key={dk} className={`lr-day lr-mono${on?" on":""}`}><span className="dl">{DAY_LABELS[i]}</span></div>;
+                    })}
+                  </div>
+                )}
+                {d.callback?.note && (
+                  <div className="rpt-note" style={{lineHeight:1.5,padding:"4px 6px",background:"#0d141b",border:"1px solid #21303b",borderRadius:2}}>
+                    <span style={{color:"#eef3f7",fontWeight:700}}>"{d.callback?.note}"</span>
+                  </div>
+                )}
+              </div>
               <div style={{gridColumn:"1 / -1"}}>
                 <span className="field-lbl lr-mono">Service address</span>
                 <div style={{display:"flex",alignItems:"flex-start",gap:4}}>
@@ -1059,26 +1098,6 @@ function Report({ call, rptNum }) {
               </div>
             </div>
            </div>
-          {/* Callback. Lives in the left column so desktop renders it directly
-              under the dispatch note; on mobile .rpt-left is display:contents, so
-              it becomes a flex child of the grid and order:3 puts it under
-              Priority instead. One element, a different slot per platform. */}
-          <div className="box rpt-callback" style={{marginBottom:0}}>
-            <div className="sec-title lr-mono"><Icon name="clock"/> Best callback window</div>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
-              <div className="lr-mono" style={{fontSize:"clamp(14px,4vw,18px)",color:"#e6b074",fontWeight:700,lineHeight:1}}>{d.callback?.time||"Anytime"}</div>
-              <div className="lr-mono fs-75" style={{color:"#56697b",letterSpacing:1,textTransform:"uppercase"}}>{d.callback?.period||""}</div>
-            </div>
-            <div style={{display:"flex",gap:3,marginBottom:5}}>
-              {DAY_KEYS.map((dk,i)=>{
-                const on = isDayActive(dk,days);
-                return <div key={dk} className={`lr-day lr-mono${on?" on":""}`}><span className="dl">{DAY_LABELS[i]}</span></div>;
-              })}
-            </div>
-            <div className="rpt-note" style={{lineHeight:1.5,padding:"4px 6px",background:"#0d141b",border:"1px solid #21303b",borderRadius:2}}>
-              <span style={{color:"#eef3f7",fontWeight:700}}>"{d.callback?.note||""}"</span>
-            </div>
-          </div>
           </div>
 
           {/* RIGHT COLUMN */}
@@ -1201,6 +1220,27 @@ export default function App() {
     });
   }, [mobileOpenId]);
 
+  // The open report's blueprint image, fetched on demand since the list no
+  // longer carries it. Keyed by id and remembered, so re-opening a call does not
+  // re-download; the ref tracks what has been asked for so a slow request is not
+  // fired twice.
+  const [images, setImages] = useState({});
+  const imgAsked = React.useRef(new Set());
+  useEffect(() => {
+    const id = selected?.id;
+    if (!id || imgAsked.current.has(id)) return;
+    imgAsked.current.add(id);
+    let live = true;
+    fetch(`https://xofgjzfofmjziycqprhq.supabase.co/rest/v1/calls?select=image_url&id=eq.${id}`, {
+      cache: "no-store",
+      headers: {apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}`}
+    })
+    .then(r => r.ok ? r.json() : null)
+    .then(rows => { if (live) setImages(m => ({...m, [id]: (rows && rows[0] && rows[0].image_url) || null})); })
+    .catch(() => { if (live) setImages(m => ({...m, [id]: null})); });
+    return () => { live = false; };
+  }, [selected?.id]);
+
   // Soft archive/delete/restore. Optimistic in state, reverted if the PATCH
   // fails — nothing is destroyed, both columns are timestamps that can be
   // nulled again from the Archive and Trash views.
@@ -1261,7 +1301,11 @@ export default function App() {
     // rather than rejecting, which strands the app on the loading screen.
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 15000);
-    fetch(`https://xofgjzfofmjziycqprhq.supabase.co/rest/v1/calls?select=*&client_id=eq.${encodeURIComponent(clientId)}&order=created_at.desc&limit=50`, {
+    // Everything except image_url. Those hold base64 data: URIs — ~296KB a row,
+    // 14.4MB of a 14.8MB response for 50 rows — and only the one open report can
+    // show one. Pulling them all made the list time out on any mobile connection.
+    // The open report fetches its own image below.
+    fetch(`https://xofgjzfofmjziycqprhq.supabase.co/rest/v1/calls?select=${LIST_COLS}&client_id=eq.${encodeURIComponent(clientId)}&order=created_at.desc&limit=50`, {
       signal: ctl.signal,
       cache: "no-store",              // iOS Safari serves stale cached failures aggressively
       headers: {
@@ -1383,13 +1427,13 @@ export default function App() {
           : <CallLog calls={visibleCalls} accordion expandedId={mobileOpenId}
               view={view} onViewChange={setView}
               rowActions={rowActions}
-              onEmptyTrash={emptyTrash}
+              onEmptyTrash={emptyTrash} images={images}
               onToggle={toggleMobile} rptNum={rptNum}/>}
       </div>
 
       {/* DESKTOP: report pane. Hidden at <=767px. */}
       <div className="lr-report">
-        {stateCard || (selected && <Report call={selected} rptNum={rptNum}/>)}
+        {stateCard || (selected && <Report call={selected} rptNum={rptNum} imageUrl={images[selected.id]}/>)}
       </div>
     </>
   );
