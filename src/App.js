@@ -318,30 +318,22 @@ const css = `
   .lr-log-group-label:first-child{margin-top:0}
   .lr-log-group + .lr-log-group{margin-top:6px}
   /* A date header is a control, but as bare grey text among grey labels it read
-     as a caption. Give it a surface, the amber the app already uses for "you can
-     act on this", and a 46px target — above the ~44px a fingertip needs, so it
-     can be hit without aiming. Shared by both platforms; mobile adds only press
-     feedback on top. */
-  .lr-log-group-hdr{display:flex;align-items:center;gap:10px;width:100%;
-    padding:12px 14px;min-height:46px;text-align:left;cursor:pointer;
-    background:#141d25;border:1px solid #26333f;border-radius:6px;margin-bottom:6px;
+     as a caption — hence the surface, the amber the app already uses for "you
+     can act on this", and the box treatment. It is an index entry either way, so
+     open and closed are the same size, padding and type: only the arrow turns
+     and the rows appear. Sized just under .lr-log-label, the list heading above
+     it, so the dates read as structure rather than as content. */
+  .lr-log-group-hdr{display:flex;align-items:center;gap:8px;width:100%;
+    padding:5px 10px;min-height:24px;text-align:left;cursor:pointer;
+    background:#141d25;border:1px solid #26333f;border-radius:5px;margin-bottom:4px;
     -webkit-tap-highlight-color:transparent;
     transition:background .15s ease,border-color .15s ease,transform .09s ease}
-  .lr-log-group-hdr .lr-log-group-label{margin:0;color:#c89456;font-size:11px}
-  .lr-log-caret{display:inline-block;font-size:10px;color:#c89456;transform:rotate(0deg);transition:transform .18s ease;flex-shrink:0}
+  .lr-log-group-hdr .lr-log-group-label{margin:0;color:#c89456;font-size:7.5px}
+  .lr-log-caret{display:inline-block;font-size:6.5px;color:#c89456;transform:rotate(0deg);transition:transform .18s ease;flex-shrink:0}
   .lr-log-caret.open{transform:rotate(90deg)}
-  .lr-log-count{margin-left:auto;font-size:10px;letter-spacing:1px;color:#82a0ba;
-    background:#0d141b;border:1px solid #26333f;border-radius:10px;padding:2px 8px;
+  .lr-log-count{margin-left:auto;font-size:7.5px;letter-spacing:1px;color:#82a0ba;
+    background:#0d141b;border:1px solid #26333f;border-radius:8px;padding:1px 6px;
     line-height:1.4;flex-shrink:0}
-  /* an open group is the one you are reading — mark it and drop the gap so its
-     rows read as belonging to it */
-  .lr-log-group-hdr[aria-expanded="true"]{background:rgba(200,148,86,.07);
-    border-color:rgba(200,148,86,.35);margin-bottom:8px}
-  /* A collapsed group is an index entry, not a card: it needs to fit its label,
-     arrow and count and nothing more. The 46px finger target only has to hold
-     for the header you are actually working with. */
-  .lr-log-group-hdr[aria-expanded="false"]{min-height:28px;padding:4px 14px;margin-bottom:4px}
-  .lr-log-group-hdr[aria-expanded="false"] .lr-log-count{padding:1px 7px}
   .lr-log-item{display:flex;align-items:center;flex-wrap:wrap;row-gap:3px;gap:8px;padding:8px 10px;border:1px solid #21303b;border-radius:3px;background:#141d25;cursor:pointer;transition:border-color .15s}
   .lr-log-item:hover{border-color:#2b3a47}
   /* Selection wears the row's own tier colour rather than a single amber, so a
@@ -497,11 +489,11 @@ const css = `
        a longer address than any seen so far could overflow again */
     .rpt-fields > div{min-width:0}
     .field-val,.field-val-dim{overflow-wrap:anywhere}
-    .rpt-lead-section{border-left:3px solid #c89456;order:1}
+    .rpt-lead-section{border-left:3px solid var(--rpt-accent,#c89456);order:1}
     .rpt-priority{order:2}
     .rpt-story-section{order:3}
-    .rpt-callback{order:4}
-    .rpt-problem{order:5}
+    .rpt-problem{order:4}
+    .rpt-callback{order:5}
     /* separated the two halves inside one card; now they are two cards */
     .rpt-story-section > .div-h{display:none}
     .rpt-story-section > div{margin-top:0 !important}
@@ -514,6 +506,10 @@ const css = `
     .field-val-dim{font-size:14px}
     .sec-title{font-size:11px}
     .lr-log-label{font-size:11px}
+    .lr-log-group-hdr{padding:6px 12px;min-height:28px;gap:9px}
+    .lr-log-group-hdr .lr-log-group-label{font-size:10px}
+    .lr-log-caret{font-size:8.5px}
+    .lr-log-count{font-size:10px;padding:1px 7px}
     .lr-tier .tn{font-size:10px}
     .lr-tier .tr{font-size:10px}
     .lr-tier.active .tn{font-size:11.5px}
@@ -954,13 +950,15 @@ function Report({ call, rptNum }) {
   const tier = d.priority?.tier || "Standard";
   const tc = TIER_COLORS[tier] || TIER_COLORS.Standard;
   const days = d.callback?.days || [];
-  const addrParts = (d.lead?.address_line2||"").split(",");
+  const addrLine2 = (d.lead?.address_line2||"").trim();
+  const hasLine2 = !!addrLine2 && !/^not provided$/i.test(addrLine2);
+  const addrParts = addrLine2.split(",");
   const city = addrParts[0]?.trim()||"";
   const stateZip = addrParts.slice(1).join(",").trim()||"";
   const imageUrl = call.image_url || null;
 
   return (
-    <div className="lr-card">
+    <div className="lr-card" style={{"--rpt-accent":tc.border}}>
       <div className="lr-grid-bg"/>
       <span className="lr-crop tl"/><span className="lr-crop tr"/>
       <span className="lr-crop bl"/><span className="lr-crop br"/>
@@ -1003,7 +1001,8 @@ function Report({ call, rptNum }) {
           {/* LEFT BOX. The two halves inside are wrapped so mobile can slot
               Priority between them; on desktop the wrappers are display:contents,
               so this renders exactly as one box the way it always has. */}
-          <div className="box rpt-left" style={{borderLeft:"3px solid #c89456",marginBottom:0}}>
+          {/* accent follows the call's tier, like the log row's edge bar */}
+          <div className="box rpt-left" style={{borderLeft:"3px solid var(--rpt-accent)",marginBottom:0}}>
            <div className="box rpt-lead-section">
             <div className="rpt-lead-top">
               {/* mobile only — mirrors the header meta the mobile view drops.
@@ -1013,9 +1012,9 @@ function Report({ call, rptNum }) {
                 <div>Recv <span style={{color:"#aebfcc"}}>{fmtRecv(call.created_at)}</span></div>
               </div>
               <div className="rpt-lead-head">
-                <div style={{display:"inline-flex",alignItems:"center",gap:5,padding:"2px 8px",border:"1px solid #c89456",background:"rgba(200,148,86,.1)",borderRadius:2,marginBottom:6}}>
-                  <span style={{width:4,height:4,borderRadius:"50%",background:"#e6b074",display:"inline-block"}}/>
-                  <span className="lr-mono fs-75" style={{letterSpacing:2,color:"#e6b074",textTransform:"uppercase",fontWeight:700}}>New Lead</span>
+                <div style={{display:"inline-flex",alignItems:"center",gap:5,padding:"2px 8px",border:`1px solid ${tc.border}`,background:tc.bg,borderRadius:2,marginBottom:6}}>
+                  <span style={{width:4,height:4,borderRadius:"50%",background:tc.dot,display:"inline-block"}}/>
+                  <span className="lr-mono fs-75" style={{letterSpacing:2,color:tc.text,textTransform:"uppercase",fontWeight:700}}>New Lead</span>
                 </div>
                 <div className="lr-serif" style={{fontStyle:"italic",fontSize:"clamp(18px,5vw,24px)",color:"#eef3f7",lineHeight:1,marginBottom:2}}>{d.lead?.name||"Unknown"}</div>
                 <div className="lr-mono fs-75" style={{letterSpacing:"1.5px",color:"#56697b",textTransform:"uppercase",marginBottom:6}}>{d.lead?.descriptor||""}</div>
@@ -1026,8 +1025,6 @@ function Report({ call, rptNum }) {
               {[
                 {icon:"device-mobile",label:"Phone",val:d.lead?.phone},
                 {icon:"message-dots",label:"Preferred contact",val:d.lead?.preferred_contact},
-                {icon:"at",label:"Email",val:d.lead?.email},
-                {icon:"antenna",label:"How they found you",val:d.lead?.how_found},
               ].map(({icon,label,val})=>(
                 <div key={label}>
                   <span className="field-lbl lr-mono">{label}</span>
@@ -1043,8 +1040,9 @@ function Report({ call, rptNum }) {
                   <Icon name="map-pin" className="field-icon" style={{color:"#56697b",marginTop:1}}/>
                   <div>
                     <div className="field-val lr-mono">{d.lead?.address_line1||"Not provided"}</div>
-                    <div className="field-val-dim lr-mono">{city}</div>
-                    <div className="field-val-dim lr-mono">{stateZip}</div>
+                    {/* an absent second line is blank space, not information */}
+                    {hasLine2 && <div className="field-val-dim lr-mono">{city}</div>}
+                    {hasLine2 && stateZip && <div className="field-val-dim lr-mono">{stateZip}</div>}
                   </div>
                 </div>
               </div>
@@ -1095,24 +1093,6 @@ function Report({ call, rptNum }) {
               })}
             </div>
 
-            {/* Callback */}
-            <div className="box rpt-callback" style={{marginBottom:0}}>
-              <div className="sec-title lr-mono"><Icon name="clock"/> Best callback window</div>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
-                <div className="lr-mono" style={{fontSize:"clamp(14px,4vw,18px)",color:"#e6b074",fontWeight:700,lineHeight:1}}>{d.callback?.time||"Anytime"}</div>
-                <div className="lr-mono fs-75" style={{color:"#56697b",letterSpacing:1,textTransform:"uppercase"}}>{d.callback?.period||""}</div>
-              </div>
-              <div style={{display:"flex",gap:3,marginBottom:5}}>
-                {DAY_KEYS.map((dk,i)=>{
-                  const on = isDayActive(dk,days);
-                  return <div key={dk} className={`lr-day lr-mono${on?" on":""}`}><span className="dl">{DAY_LABELS[i]}</span></div>;
-                })}
-              </div>
-              <div className="rpt-note" style={{lineHeight:1.5,padding:"4px 6px",background:"#0d141b",border:"1px solid #21303b",borderRadius:2}}>
-                <span style={{color:"#eef3f7",fontWeight:700}}>"{d.callback?.note||""}"</span>
-              </div>
-            </div>
-
             {/* Problem + AI Image */}
             <div className="box rpt-problem" style={{borderLeft:"3px solid #e6b074",marginBottom:0,background:"#071020"}}>
               <div className="sec-title lr-mono"><Icon name="tool"/> Reported problem</div>
@@ -1131,6 +1111,25 @@ function Report({ call, rptNum }) {
               <div className="rpt-quote" style={{textAlign:"center",padding:"3px 6px",background:"#0b1520",border:"1px solid #1a3a5c",borderRadius:2,marginTop:5}}>
                 <span style={{color:"#56697b"}}>In their words: </span>
                 <span style={{color:"#eef3f7",fontWeight:700}}>"{d.problem?.quote||""}"</span>
+              </div>
+            </div>
+
+            {/* Callback — last, so on desktop it lands beside the dispatch note
+                area at the foot of the left column rather than leaving it blank */}
+            <div className="box rpt-callback" style={{marginBottom:0}}>
+              <div className="sec-title lr-mono"><Icon name="clock"/> Best callback window</div>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+                <div className="lr-mono" style={{fontSize:"clamp(14px,4vw,18px)",color:"#e6b074",fontWeight:700,lineHeight:1}}>{d.callback?.time||"Anytime"}</div>
+                <div className="lr-mono fs-75" style={{color:"#56697b",letterSpacing:1,textTransform:"uppercase"}}>{d.callback?.period||""}</div>
+              </div>
+              <div style={{display:"flex",gap:3,marginBottom:5}}>
+                {DAY_KEYS.map((dk,i)=>{
+                  const on = isDayActive(dk,days);
+                  return <div key={dk} className={`lr-day lr-mono${on?" on":""}`}><span className="dl">{DAY_LABELS[i]}</span></div>;
+                })}
+              </div>
+              <div className="rpt-note" style={{lineHeight:1.5,padding:"4px 6px",background:"#0d141b",border:"1px solid #21303b",borderRadius:2}}>
+                <span style={{color:"#eef3f7",fontWeight:700}}>"{d.callback?.note||""}"</span>
               </div>
             </div>
 
