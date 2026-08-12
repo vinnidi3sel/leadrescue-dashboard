@@ -328,7 +328,7 @@ const css = `
     background:#141d25;border:1px solid #26333f;border-radius:5px;margin-bottom:4px;
     -webkit-tap-highlight-color:transparent;
     transition:background .15s ease,border-color .15s ease,transform .09s ease}
-  .lr-log-group-hdr .lr-log-group-label{margin:0;color:#c89456;font-size:7.5px}
+  .lr-log-group-hdr .lr-log-group-label{margin:0;color:#eef3f7;font-size:7.5px}
   .lr-log-caret{display:inline-block;font-size:6.5px;color:#c89456;transform:rotate(0deg);transition:transform .18s ease;flex-shrink:0}
   .lr-log-caret.open{transform:rotate(90deg)}
   .lr-log-count{margin-left:auto;font-size:7.5px;letter-spacing:1px;color:#82a0ba;
@@ -346,7 +346,9 @@ const css = `
       var(--tier-fill,rgba(200,148,86,.06))),#141d25}
   .lr-log-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
   .lr-log-name{font-size:11px;color:#eef3f7;font-weight:500;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .lr-log-time{font-size:9px;color:#c89456;flex-shrink:0}
+  /* Amber here read as a priority signal, which is the tier pill's job. The dot
+     and the pill are the only tier-coloured things in a row. */
+  .lr-log-time{font-size:9px;color:#eef3f7;flex-shrink:0}
   /* tier word, styled as the pill: colour at full strength on itself at 15%,
      both set inline from TIER_DOT_COLORS. nowrap so EMERGENCY never breaks. */
   .lr-log-tier{flex-shrink:0;white-space:nowrap;font-size:7.5px;letter-spacing:.08em;
@@ -356,8 +358,8 @@ const css = `
   .lr-log-problem{order:1;flex:0 0 100%;min-width:0;display:flex;align-items:baseline;
     gap:6px;line-height:1.3}
   .lr-log-problem-lbl{flex-shrink:0;font-size:7.5px;letter-spacing:1px;
-    text-transform:uppercase;color:#c89456}
-  .lr-log-problem-val{min-width:0;font-size:9.5px;color:#7d8fa0;
+    text-transform:uppercase;color:#eef3f7}
+  .lr-log-problem-val{min-width:0;font-size:9.5px;color:#eef3f7;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .lr-log-chevron{font-size:10px;color:#56697b;flex-shrink:0}
   /* The reveal shell, shared. Mobile drags it with a finger, desktop slides it
@@ -464,6 +466,11 @@ const css = `
     .lr-card{margin-top:16px}
     .lr-pad{padding:20px}
     .report-grid{display:grid;grid-template-columns:1.5fr 1fr;gap:10px;align-items:start}
+    /* Inside the left box the callback window is another section of that card,
+       not a card sitting on a card — so it sheds the .box chrome and takes a
+       rule above it, the way the tone read and dispatch note are separated. */
+    .rpt-left > .rpt-callback{background:none;border:none;border-radius:0;padding:0;
+      margin-top:10px;padding-top:10px;border-top:1px solid #21303b}
     .report-right{display:flex;flex-direction:column;gap:8px}
     .lr-log-mobile{display:none}
   }
@@ -491,9 +498,11 @@ const css = `
     .field-val,.field-val-dim{overflow-wrap:anywhere}
     .rpt-lead-section{border-left:3px solid var(--rpt-accent,#c89456);order:1}
     .rpt-priority{order:2}
-    .rpt-story-section{order:3}
-    .rpt-problem{order:4}
-    .rpt-callback{order:5}
+    /* mobile wants the callback window straight after Priority; desktop wants it
+       under the dispatch note. Same element, different slot per platform. */
+    .rpt-callback{order:3}
+    .rpt-story-section{order:4}
+    .rpt-problem{order:5}
     /* separated the two halves inside one card; now they are two cards */
     .rpt-story-section > .div-h{display:none}
     .rpt-story-section > div{margin-top:0 !important}
@@ -1063,6 +1072,26 @@ function Report({ call, rptNum }) {
               </div>
             </div>
            </div>
+          {/* Callback. Lives in the left column so desktop renders it directly
+              under the dispatch note; on mobile .rpt-left is display:contents, so
+              it becomes a flex child of the grid and order:3 puts it under
+              Priority instead. One element, a different slot per platform. */}
+          <div className="box rpt-callback" style={{marginBottom:0}}>
+            <div className="sec-title lr-mono"><Icon name="clock"/> Best callback window</div>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+              <div className="lr-mono" style={{fontSize:"clamp(14px,4vw,18px)",color:"#e6b074",fontWeight:700,lineHeight:1}}>{d.callback?.time||"Anytime"}</div>
+              <div className="lr-mono fs-75" style={{color:"#56697b",letterSpacing:1,textTransform:"uppercase"}}>{d.callback?.period||""}</div>
+            </div>
+            <div style={{display:"flex",gap:3,marginBottom:5}}>
+              {DAY_KEYS.map((dk,i)=>{
+                const on = isDayActive(dk,days);
+                return <div key={dk} className={`lr-day lr-mono${on?" on":""}`}><span className="dl">{DAY_LABELS[i]}</span></div>;
+              })}
+            </div>
+            <div className="rpt-note" style={{lineHeight:1.5,padding:"4px 6px",background:"#0d141b",border:"1px solid #21303b",borderRadius:2}}>
+              <span style={{color:"#eef3f7",fontWeight:700}}>"{d.callback?.note||""}"</span>
+            </div>
+          </div>
           </div>
 
           {/* RIGHT COLUMN */}
@@ -1111,25 +1140,6 @@ function Report({ call, rptNum }) {
               <div className="rpt-quote" style={{textAlign:"center",padding:"3px 6px",background:"#0b1520",border:"1px solid #1a3a5c",borderRadius:2,marginTop:5}}>
                 <span style={{color:"#56697b"}}>In their words: </span>
                 <span style={{color:"#eef3f7",fontWeight:700}}>"{d.problem?.quote||""}"</span>
-              </div>
-            </div>
-
-            {/* Callback — last, so on desktop it lands beside the dispatch note
-                area at the foot of the left column rather than leaving it blank */}
-            <div className="box rpt-callback" style={{marginBottom:0}}>
-              <div className="sec-title lr-mono"><Icon name="clock"/> Best callback window</div>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
-                <div className="lr-mono" style={{fontSize:"clamp(14px,4vw,18px)",color:"#e6b074",fontWeight:700,lineHeight:1}}>{d.callback?.time||"Anytime"}</div>
-                <div className="lr-mono fs-75" style={{color:"#56697b",letterSpacing:1,textTransform:"uppercase"}}>{d.callback?.period||""}</div>
-              </div>
-              <div style={{display:"flex",gap:3,marginBottom:5}}>
-                {DAY_KEYS.map((dk,i)=>{
-                  const on = isDayActive(dk,days);
-                  return <div key={dk} className={`lr-day lr-mono${on?" on":""}`}><span className="dl">{DAY_LABELS[i]}</span></div>;
-                })}
-              </div>
-              <div className="rpt-note" style={{lineHeight:1.5,padding:"4px 6px",background:"#0d141b",border:"1px solid #21303b",borderRadius:2}}>
-                <span style={{color:"#eef3f7",fontWeight:700}}>"{d.callback?.note||""}"</span>
               </div>
             </div>
 
