@@ -377,11 +377,6 @@ const css = `
     background:rgba(220,91,78,.06);border-radius:3px}
   .lr-trash-warn{font-size:10px;color:#f0a59b;line-height:1.4;flex:1;min-width:140px}
   .lr-view-btn.danger{border-color:#a33f35;color:#f0a59b;background:rgba(220,91,78,.12)}
-  /* mobile keeps an always-visible Restore; desktop surfaces it in the reveal */
-  .lr-restore{display:none;flex-shrink:0;background:none;border:1px solid #378add;
-    color:#378add;font-size:8px;letter-spacing:1px;text-transform:uppercase;
-    padding:3px 7px;border-radius:3px;cursor:pointer}
-  .lr-restore:hover{background:rgba(55,138,221,.12)}
   /* view switcher lives in the log's own header row */
   .lr-log-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
   .lr-log-head .lr-log-label{margin-bottom:0}
@@ -613,7 +608,7 @@ const css = `
     }
     /* mobile drags a fixed-width panel, so its threshold math stays put */
     .lr-swipe{margin-bottom:6px}
-    .lr-swipe-actions{width:96px}
+    .lr-swipe-actions{width:var(--swipe-w,96px)}
     .lr-swipe-btn{flex:1;font-size:11px}
     /* pan-y keeps vertical scrolling with the browser and hands us the
        horizontal gesture, so the drag needs no preventDefault */
@@ -632,7 +627,6 @@ const css = `
     .lr-log-problem-lbl{font-size:9px}
     .lr-log-problem-val{font-size:11.5px}
     .lr-log-time{font-size:11px;line-height:1.2}
-    .lr-restore{display:inline-block;font-size:10px;padding:4px 9px}
     .lr-log-views{gap:5px}
     .lr-view-btn{font-size:10px;padding:4px 9px}
     .lr-log-none{font-size:13px}
@@ -646,26 +640,25 @@ const css = `
   .ai-img-label{font-family:'DejaVu Sans Mono',monospace;font-size:7px;letter-spacing:1.5px;color:#4a7a9b;text-transform:uppercase;text-align:center;margin-top:5px;opacity:.7}
 `;
 
-const SWIPE_W = 96;   // one action per view — see swipeAction in App
-
 // One row shape on both platforms, two lines: dot / tier / name / time / chevron,
 // then the problem title beneath on its own line. order:1 + flex-basis:100% on
 // .lr-log-problem does the wrapping, so the markup is identical everywhere and
 // only the type scale is per-platform.
 // The dot stays hidden on mobile — the 4px --tier edge bar already carries the
 // colour there, and a second marker 11px away would encode the tier twice.
-function CallLogItem({ call, isActive, expanded, rowId, onClick, swipeAction, onRestore,
-                       revealed, actions }) {
+function CallLogItem({ call, isActive, expanded, rowId, onClick, revealed, actions }) {
   const tier = call.report_json?.priority?.tier || "Standard";
   const dot = TIER_DOT_COLORS[tier] || "#82a0ba";
   const problem = call.report_json?.problem?.title || "";
   const [dx, setDx] = useState(0);
   const openRef = React.useRef(false);
   const drag = React.useRef(null);
-  // One list feeds one panel. Mobile passes a single swipe action, desktop the
-  // per-view set; the reveal below is identical either way.
-  const acts = swipeAction ? [swipeAction] : (actions || []);
+  // One list feeds one panel on both platforms; only the trigger differs.
+  const acts = actions || [];
   const swipeOn = acts.length > 0;
+  // A single action reveals 96px; a pair shares 168px, which still leaves the
+  // caller name and time readable on a 375px row.
+  const swipeW = acts.length > 1 ? 168 : 96;
   const panelRef = React.useRef(null);
   const [panelW, setPanelW] = useState(0);
   // Desktop's panel sizes to its buttons, so measure it rather than assuming —
@@ -682,7 +675,7 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick, swipeAction, on
   function onTouchStart(e) {
     if (!swipeOn) return;
     const t = e.touches[0];
-    drag.current = {x:t.clientX, y:t.clientY, axis:null, base: openRef.current ? -SWIPE_W : 0};
+    drag.current = {x:t.clientX, y:t.clientY, axis:null, base: openRef.current ? -swipeW : 0};
   }
   function onTouchMove(e) {
     const s0 = drag.current; if (!s0) return;
@@ -692,14 +685,14 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick, swipeAction, on
       s0.axis = Math.abs(mx) > Math.abs(my) ? "x" : "y";
     }
     if (s0.axis !== "x") return;
-    setDx(Math.max(-SWIPE_W, Math.min(0, s0.base + mx)));
+    setDx(Math.max(-swipeW, Math.min(0, s0.base + mx)));
   }
   function onTouchEnd() {
     const s0 = drag.current; drag.current = null;
     if (!s0 || s0.axis !== "x") return;
-    const willOpen = dx < -SWIPE_W / 2;
+    const willOpen = dx < -swipeW / 2;
     openRef.current = willOpen;
-    setDx(willOpen ? -SWIPE_W : 0);
+    setDx(willOpen ? -swipeW : 0);
   }
   function handleClick() {
     // a swiped-open row absorbs the tap: close it rather than expanding
@@ -709,7 +702,7 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick, swipeAction, on
   function run(fn) { openRef.current = false; setDx(0); fn(call); }
 
   return (
-    <div className="lr-swipe">
+    <div className="lr-swipe" style={{"--swipe-w":`${swipeW}px`}}>
       {swipeOn && (
         // hidden and untappable until the row is actually displaced — an .active
         // row's tint is not fully opaque, so anything still painted here shows
@@ -743,10 +736,6 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick, swipeAction, on
           </span>
         )}
         <span className="lr-log-time lr-mono">{fmtTime(call.created_at)}</span>
-        {onRestore && (
-          <button type="button" className="lr-restore lr-mono"
-            onClick={e => {e.stopPropagation(); onRestore(call);}}>Restore</button>
-        )}
         <span className="lr-log-chevron">›</span>
       </div>
     </div>
@@ -764,7 +753,7 @@ const EMPTY_VIEW = { log:"No calls in the log.", archive:"Nothing archived.", tr
 //  - default (desktop sidebar): rows select, the report lives in its own pane
 //  - accordion (mobile): rows toggle, the report renders inline under the open row
 function CallLog({ calls, selectedId, onSelect, accordion=false, expandedId=null, onToggle, rptNum,
-                   view="log", onViewChange, swipeAction, onRestore, onEmptyTrash, rowActions }) {
+                   view="log", onViewChange, onEmptyTrash, rowActions }) {
   // date label -> bool. Absent = use the default (Today open, everything else collapsed).
   const [openOverrides, setOpenOverrides] = useState({});
   const [confirmEmpty, setConfirmEmpty] = useState(false);
@@ -858,10 +847,8 @@ function CallLog({ calls, selectedId, onSelect, accordion=false, expandedId=null
                 <React.Fragment key={c.id}>
                   <CallLogItem
                     call={c}
-                    swipeAction={accordion ? swipeAction : null}
-                    onRestore={accordion ? onRestore : null}
                     revealed={!accordion && revealedId === c.id}
-                    actions={accordion ? null : rowActions}
+                    actions={rowActions}
                     isActive={isCurrent}
                     expanded={accordion && isCurrent}
                     // id only in accordion mode — the desktop log renders the same
@@ -1257,20 +1244,13 @@ export default function App() {
     .catch(() => { setCalls(before); });
   }, [calls, clientId]);
 
-  // Desktop reveal strip. Same destinations as the mobile swipe, but the archive
-  // and trash views also carry Restore, which mobile shows as a standing button.
+  // One set per view, both platforms. Every action lives in the reveal — a row
+  // shows no buttons until it is asked to, whichever view it is in.
   const rowActions =
       view === "log"     ? [{label:"Archive", cls:"arch", run:archiveCall}]
-    : view === "archive" ? [{label:"Delete",  cls:"del",  run:deleteCall},
-                            {label:"Restore", cls:"rest", run:restoreCall}]
+    : view === "archive" ? [{label:"Restore", cls:"rest", run:restoreCall},
+                            {label:"Delete",  cls:"del",  run:deleteCall}]
     :                      [{label:"Restore", cls:"rest", run:restoreCall}];
-
-  // one action per view: archive out of the log, delete out of the archive,
-  // nothing in the trash — its only exits are Restore and Empty trash
-  const swipeAction =
-      view === "log"     ? {label:"Archive", cls:"arch", run:archiveCall}
-    : view === "archive" ? {label:"Delete",  cls:"del",  run:deleteCall}
-    : null;
 
   const loadCalls = React.useCallback(() => {
     // No tenant, no request.
@@ -1356,8 +1336,7 @@ export default function App() {
         <BrandLockup uid="sidebar"/>
       </div>
       <CallLog calls={visibleCalls} selectedId={selected?.id} view={view} onViewChange={setView}
-        onRestore={view==="log" ? null : restoreCall} onEmptyTrash={emptyTrash}
-        rowActions={rowActions}
+        onEmptyTrash={emptyTrash} rowActions={rowActions}
         onSelect={c=>{setSelected(c);window.scrollTo&&window.scrollTo({top:0,behavior:"smooth"})}}/>
     </>
   );
@@ -1403,8 +1382,7 @@ export default function App() {
           ? <div className="lr-mobile-state">{stateCard}</div>
           : <CallLog calls={visibleCalls} accordion expandedId={mobileOpenId}
               view={view} onViewChange={setView}
-              swipeAction={swipeAction}
-              onRestore={view==="log" ? null : restoreCall}
+              rowActions={rowActions}
               onEmptyTrash={emptyTrash}
               onToggle={toggleMobile} rptNum={rptNum}/>}
       </div>
