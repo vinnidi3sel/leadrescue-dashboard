@@ -414,12 +414,17 @@ const css = `
   .field-val{font-size:clamp(9px,2.8vw,11px);color:#eef3f7;font-weight:500;line-height:1.35}
   .field-val-dim{font-size:clamp(9px,2.5vw,10px);color:#aebfcc;line-height:1.35}
   .div-h{border:none;border-top:1px solid #21303b;margin:.35rem 0}
-  /* time and preference on one line — the time carries the weight, the
-     preference trails it after a mid-dot */
-  .rpt-reach{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px;margin:1px 0 5px}
-  .rpt-reach-time{font-size:clamp(13px,3.6vw,16px);color:#e6b074;font-weight:700;line-height:1.15}
-  .rpt-reach-sep{color:#56697b;line-height:1.15}
-  .rpt-reach-pref{font-size:clamp(9px,2.4vw,10px);color:#aebfcc;letter-spacing:.5px;line-height:1.2}
+  /* The phone number is the most-used thing on the report, so it outranks
+     everything below it. Only the caller's name is larger. */
+  .rpt-phone-row{display:flex;align-items:center;gap:5px}
+  .rpt-phone-row .field-icon{font-size:14px}
+  .rpt-phone{font-size:clamp(15px,4.2vw,19px);color:#eef3f7;font-weight:700;
+    line-height:1.2;letter-spacing:.5px}
+  /* Timing is a modifier on the number above it, not a peer — small, dim, one
+     line, tucked close enough that the two read as a single block. */
+  .rpt-reach{display:flex;align-items:baseline;flex-wrap:wrap;gap:5px;margin-top:3px;
+    font-size:10px;color:#82a0ba;line-height:1.3}
+  .rpt-reach-sep{color:#56697b}
   .box{background:#141d25;border:1px solid #21303b;border-radius:3px;padding:.75rem;margin-bottom:8px}
   .box:last-child{margin-bottom:0}
   .lr-day{width:18px;height:18px;border-radius:2px;display:flex;align-items:center;justify-content:center;border:1px solid #21303b;background:#0d141b}
@@ -449,7 +454,6 @@ const css = `
      which a clamp cannot do on its own (a min above the max wins everywhere). */
   .rpt-recap{font-size:clamp(9px,2.5vw,10.5px)}
   .rpt-body{font-size:clamp(8px,2.2vw,9.5px)}
-  .rpt-note{font-size:clamp(8px,2.2vw,9px)}
   .rpt-quote{font-size:clamp(8px,2vw,9px)}
   /* Hero spacing lifted out of the inline style, verbatim, so the mobile block
      can collapse it. */
@@ -499,8 +503,11 @@ const css = `
        column off the screen entirely. Full width fits the address, and the
        labels stop wrapping into two lines as a bonus. */
     .rpt-fields{grid-template-columns:1fr !important;gap:10px 0 !important}
-    .rpt-reach-time{font-size:17px}
-    .rpt-reach-pref{font-size:12px}
+    /* the caller name is clamp(18px,5vw,24px) — 18.75px at 375px — so the
+       number sits just under it rather than over it */
+    .rpt-phone{font-size:17px}
+    .rpt-phone-row .field-icon{font-size:15px}
+    .rpt-reach{font-size:12px}
     /* belt and braces: a grid item defaults to min-width:auto, so without this
        a longer address than any seen so far could overflow again */
     .rpt-fields > div{min-width:0}
@@ -541,7 +548,6 @@ const css = `
     /* body copy must read larger than the label above it, not smaller */
     .rpt-recap{font-size:14px}
     .rpt-body{font-size:14px}
-    .rpt-note{font-size:14px}
     .rpt-quote{font-size:14px}
     /* neither the header nor the footer fits as a single row at these sizes:
        the meta blocks grew enough to squeeze the titles into wrapping */
@@ -1072,44 +1078,33 @@ function Report({ call, rptNum, imageUrl:imageOverride }) {
             </div>
             <div className="div-h"/>
             <div className="rpt-fields" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 12px",marginTop:".3rem",marginBottom:".6rem"}}>
-              {[
-                {icon:"device-mobile",label:"Phone",val:d.lead?.phone},
-              ].map(({icon,label,val})=>(
-                <div key={label}>
-                  <span className="field-lbl lr-mono">{label}</span>
-                  <div style={{display:"flex",alignItems:"center",gap:4}}>
-                    <Icon name={icon} className="field-icon" style={{color:"#56697b"}}/>
-                    <span className="field-val lr-mono">{val||"Not provided"}</span>
-                  </div>
+              {/* Phone and its timing are one unit, not two fields. The number is
+                  what gets acted on, so it carries the weight; the timing is a
+                  modifier on it and sits small and dim directly beneath. */}
+              <div className="rpt-phone-group" style={{gridColumn:"1 / -1"}}>
+                <span className="field-lbl lr-mono">Phone</span>
+                <div className="rpt-phone-row">
+                  <Icon name="device-mobile" className="field-icon" style={{color:"#56697b"}}/>
+                  <span className="rpt-phone lr-mono">{d.lead?.phone||"Not provided"}</span>
                 </div>
-              ))}
-              {/* Best time to reach — directly under Phone, since the two answer
-                  the same question: how and when to get back to this caller. The
-                  preferred contact method folds in here rather than standing as
-                  its own field saying "Call or text" with no timing attached. */}
-              <div className="rpt-callback" style={{gridColumn:"1 / -1"}}>
-                <span className="field-lbl lr-mono">Best time to reach</span>
-                <div className="rpt-reach">
-                  <span className="rpt-reach-time lr-mono">{d.callback?.time||"Anytime"}</span>
+                <div className="rpt-reach lr-mono">
+                  <span>{d.callback?.time||"Anytime"}</span>
                   {prefers && <span className="rpt-reach-sep">·</span>}
-                  {prefers && <span className="rpt-reach-pref lr-mono">{prefers}</span>}
+                  {prefers && <span>{prefers}</span>}
                 </div>
                 {/* All seven lit says "any day", which is what no answer looks
                     like — so the strip only earns its space when it narrows things. */}
                 {dayCount > 0 && dayCount < DAY_KEYS.length && (
-                  <div style={{display:"flex",gap:3,marginBottom:5}}>
+                  <div style={{display:"flex",gap:3,marginTop:5}}>
                     {DAY_KEYS.map((dk,i)=>{
                       const on = isDayActive(dk,days);
                       return <div key={dk} className={`lr-day lr-mono${on?" on":""}`}><span className="dl">{DAY_LABELS[i]}</span></div>;
                     })}
                   </div>
                 )}
-                {d.callback?.note && (
-                  <div className="rpt-note" style={{lineHeight:1.5,padding:"4px 6px",background:"#0d141b",border:"1px solid #21303b",borderRadius:2}}>
-                    <span style={{color:"#eef3f7",fontWeight:700}}>"{d.callback?.note}"</span>
-                  </div>
-                )}
               </div>
+              {/* separates "how to reach them" from "where is it" */}
+              <div className="div-h" style={{gridColumn:"1 / -1"}}/>
               <div style={{gridColumn:"1 / -1"}}>
                 <span className="field-lbl lr-mono">Service address</span>
                 <div style={{display:"flex",alignItems:"flex-start",gap:4}}>
