@@ -537,7 +537,15 @@ const css = `
        number sits just under it rather than over it */
     .rpt-phone{font-size:17px}
     .rpt-phone-row .field-icon{font-size:15px}
-    .rpt-reach{font-size:12px}
+    /* A phone has no room for time, a quote and a preference on one row, so the
+       quote stops shrinking and reads whole instead. Flow it as text rather than
+       as flex: wrapped flex lines put each separator on a row of its own and
+       took five, where inline text reflows into two. */
+    .rpt-reach{display:block;font-size:11px}
+    .rpt-reach > span{display:inline}
+    .rpt-reach-sep{margin:0 5px}
+    .rpt-reach > .rpt-reach-q{display:inline;white-space:normal;
+      overflow:visible;text-overflow:clip}
     /* belt and braces: a grid item defaults to min-width:auto, so without this
        a longer address than any seen so far could overflow again */
     .rpt-fields > div{min-width:0}
