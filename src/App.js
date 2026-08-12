@@ -921,24 +921,61 @@ function NoClientState() {
   );
 }
 
-const FAILURE_LABEL = { api:"API error", network:"Network error", timeout:"Request timed out" };
+const FAILURE_LABEL = {
+  auth:"Credentials rejected", api:"API error",
+  network:"Network error", timeout:"Request timed out"
+};
+
+// A credentials failure is its own thing, not a generic API error: nothing about
+// the connection or the data is wrong, and no amount of retrying will help — the
+// key needs replacing. PostgREST reports it as 401/403 or a PGRST3xx code, and
+// Supabase's gateway as a plain "Invalid API key".
+const AUTH_CODES = new Set(["PGRST301","PGRST302","PGRST303"]);
+function isAuthFailure(http, code, message) {
+  return http === 401 || http === 403 || AUTH_CODES.has(code)
+    || /invalid api key|jwt (expired|invalid)|no api key/i.test(message || "");
+}
+
+function fmtBytes(n) {
+  if (!n && n !== 0) return "";
+  if (n < 1024) return `${n} B`;
+  if (n < 1048576) return `${(n/1024).toFixed(1)} KB`;
+  return `${(n/1048576).toFixed(1)} MB`;
+}
 
 function LoadErrorState({ clientId, failure, onRetry }) {
   const f = failure || {};
-  // one readable block: whatever PostgREST told us, or the transport error
+  const auth = f.kind === "auth";
+  // Everything worth pasting into a bug report, in one block. status leads: a
+  // response with no body used to surface as a bare "HTTP 500" in the message
+  // slot with the status itself nowhere to be seen. On an abort, how far it got
+  // is the whole story — "timed out, 4.2 MB in 15s" points at the payload,
+  // where "timed out" alone points nowhere.
   const detail = [
-    f.message && `message: ${f.message}`,
-    f.code    && `code: ${f.code}`,
-    f.details && `details: ${f.details}`,
-    f.hint    && `hint: ${f.hint}`
+    f.http     && `status:   HTTP ${f.http}`,
+    f.message  && `message:  ${f.message}`,
+    f.code     && `code:     ${f.code}`,
+    f.details  && `details:  ${f.details}`,
+    f.hint     && `hint:     ${f.hint}`,
+    f.ms       && `elapsed:  ${(f.ms/1000).toFixed(1)}s`,
+    // 0 B is worth printing, not hiding: "nothing ever arrived" and "4 MB then
+    // stalled" are different faults and the number is the only thing separating them
+    (f.bytes || f.kind === "timeout" || f.kind === "network")
+      ? `received: ${fmtBytes(f.bytes || 0)}${f.kind === "timeout" ? " before the timeout" : ""}` : ""
   ].filter(Boolean).join("\n");
   return (
     <div className="lr-card" style={{borderColor:"rgba(220,91,78,.4)"}}>
       <div className="lr-grid-bg"/>
       <div className="lr-pad" style={{display:"flex",flexDirection:"column",alignItems:"center",textAlign:"center",gap:4,padding:"40px 20px"}}>
         <div className="lr-mono fs-9" style={{letterSpacing:2,color:"#f0a59b",textTransform:"uppercase"}}>{FAILURE_LABEL[f.kind] || "Connection error"}</div>
-        <div className="lr-serif lr-empty-title" style={{marginTop:6}}>Couldn't load your calls</div>
-        <div className="lr-empty-body">We couldn't reach the call log just now. Check your connection and refresh — nothing has been lost.</div>
+        <div className="lr-serif lr-empty-title" style={{marginTop:6}}>
+          {auth ? "Dashboard credentials rejected" : "Couldn't load your calls"}
+        </div>
+        <div className="lr-empty-body">
+          {auth
+            ? "The API key this dashboard uses was refused. Your connection is fine and no calls have been lost — the key needs replacing before the log will load."
+            : "We couldn't reach the call log just now. Check your connection and refresh — nothing has been lost."}
+        </div>
         {detail && (
           <code style={{fontSize:12,fontFamily:"monospace",color:"#d06b5f",wordBreak:"break-word",
             whiteSpace:"pre-wrap",padding:8,marginTop:12,background:"rgba(255,255,255,0.04)",
@@ -946,7 +983,11 @@ function LoadErrorState({ clientId, failure, onRetry }) {
             display:"block"}}>{detail}</code>
         )}
         <div style={{fontSize:11,color:"#6b7c8a"}}>client: {clientId || "(none)"}</div>
-        <button className="gen-btn lr-mono" onClick={onRetry} style={{marginTop:16}}>Retry</button>
+        {auth
+          ? <div className="lr-mono" style={{fontSize:10,color:"#6b7c8a",marginTop:12,maxWidth:340,lineHeight:1.5}}>
+              Retrying will not help. Replace SUPABASE_ANON in the dashboard build.
+            </div>
+          : <button className="gen-btn lr-mono" onClick={onRetry} style={{marginTop:16}}>Retry</button>}
       </div>
     </div>
   );
@@ -1301,6 +1342,11 @@ export default function App() {
     // rather than rejecting, which strands the app on the loading screen.
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 15000);
+    // Measured so a failure can say how far it got. A timeout with no numbers
+    // attached is indistinguishable from a dead network, which cost an hour
+    // once already — the payload was the problem and nothing said so.
+    const t0 = Date.now();
+    let received = 0;
     // Everything except image_url. Those hold base64 data: URIs — ~296KB a row,
     // 14.4MB of a 14.8MB response for 50 rows — and only the one open report can
     // show one. Pulling them all made the list time out on any mobile connection.
@@ -1313,7 +1359,27 @@ export default function App() {
         Authorization: `Bearer ${SUPABASE_ANON}`
       }
     })
-    .then(r => r.json().catch(() => null).then(body => ({ok: r.ok, http: r.status, body})))
+    // Read the body as a stream rather than with .json(), so bytes are counted
+    // as they land and survive an abort part-way through.
+    .then(async r => {
+      let text = "";
+      if (r.body && r.body.getReader) {
+        const reader = r.body.getReader(), dec = new TextDecoder();
+        for (;;) {
+          const {done, value} = await reader.read();
+          if (done) break;
+          received += value.length;
+          text += dec.decode(value, {stream:true});
+        }
+        text += dec.decode();
+      } else {
+        text = await r.text();                 // no streams: count what arrived
+        received = text.length;
+      }
+      let body = null;
+      try { body = JSON.parse(text); } catch (e) {}
+      return {ok: r.ok, http: r.status, body};
+    })
     .then(({ok, http, body}) => {
       clearTimeout(timer);
       // PostgREST answers a failure with 4xx and a JSON error object, which
@@ -1321,12 +1387,17 @@ export default function App() {
       // an auth, RLS or bad-client_id failure renders as "No calls yet".
       if (!ok || !Array.isArray(body)) {
         clear();
+        const message = (body && body.message) || `HTTP ${http}`;
+        const code = (body && body.code) || "";
         setFailure({
-          kind: "api",
-          message: (body && body.message) || `HTTP ${http}`,
-          code: (body && body.code) || String(http),
+          kind: isAuthFailure(http, code, message) ? "auth" : "api",
+          http,
+          message,
+          code,
           details: (body && body.details) || "",
-          hint: (body && body.hint) || ""
+          hint: (body && body.hint) || "",
+          ms: Date.now() - t0,
+          bytes: received
         });
         setStatus("error");
         return;
@@ -1344,7 +1415,9 @@ export default function App() {
       setFailure({
         kind: timedOut ? "timeout" : "network",
         message: timedOut ? "Request timed out after 15s" : ((err && err.message) || String(err)),
-        code: "", details: "", hint: ""
+        code: "", details: "", hint: "",
+        ms: Date.now() - t0,
+        bytes: received
       });
       setStatus("error");
     });
