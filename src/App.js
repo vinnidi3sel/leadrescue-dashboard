@@ -317,12 +317,27 @@ const css = `
   .lr-log-group-label{font-size:8px;letter-spacing:1.5px;color:#56697b;text-transform:uppercase;margin-bottom:5px;margin-top:8px}
   .lr-log-group-label:first-child{margin-top:0}
   .lr-log-group + .lr-log-group{margin-top:6px}
-  .lr-log-group-hdr{display:flex;align-items:center;gap:7px;width:100%;padding:6px 2px;background:none;border:none;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
-  .lr-log-group-hdr .lr-log-group-label{margin:0}
-  .lr-log-caret{display:inline-block;font-size:7px;color:#56697b;transform:rotate(0deg);transition:transform .18s ease;flex-shrink:0}
+  /* A date header is a control, but as bare grey text among grey labels it read
+     as a caption. Give it a surface, the amber the app already uses for "you can
+     act on this", and a 46px target — above the ~44px a fingertip needs, so it
+     can be hit without aiming. Shared by both platforms; mobile adds only press
+     feedback on top. */
+  .lr-log-group-hdr{display:flex;align-items:center;gap:10px;width:100%;
+    padding:12px 14px;min-height:46px;text-align:left;cursor:pointer;
+    background:#141d25;border:1px solid #26333f;border-radius:6px;margin-bottom:6px;
+    -webkit-tap-highlight-color:transparent;
+    transition:background .15s ease,border-color .15s ease,transform .09s ease}
+  .lr-log-group-hdr .lr-log-group-label{margin:0;color:#c89456;font-size:11px}
+  .lr-log-caret{display:inline-block;font-size:10px;color:#c89456;transform:rotate(0deg);transition:transform .18s ease;flex-shrink:0}
   .lr-log-caret.open{transform:rotate(90deg)}
-  .lr-log-count{margin-left:auto;font-size:8px;letter-spacing:1px;color:#56697b;flex-shrink:0}
-  .lr-log-item{display:flex;align-items:center;flex-wrap:wrap;row-gap:3px;gap:8px;padding:8px 10px;border:1px solid #21303b;border-radius:3px;background:#141d25;margin-bottom:4px;cursor:pointer;transition:border-color .15s}
+  .lr-log-count{margin-left:auto;font-size:10px;letter-spacing:1px;color:#82a0ba;
+    background:#0d141b;border:1px solid #26333f;border-radius:10px;padding:2px 8px;
+    line-height:1.4;flex-shrink:0}
+  /* an open group is the one you are reading — mark it and drop the gap so its
+     rows read as belonging to it */
+  .lr-log-group-hdr[aria-expanded="true"]{background:rgba(200,148,86,.07);
+    border-color:rgba(200,148,86,.35);margin-bottom:8px}
+  .lr-log-item{display:flex;align-items:center;flex-wrap:wrap;row-gap:3px;gap:8px;padding:8px 10px;border:1px solid #21303b;border-radius:3px;background:#141d25;cursor:pointer;transition:border-color .15s}
   .lr-log-item:hover{border-color:#2b3a47}
   /* layered over the opaque base rather than replacing it — a translucent row
      let the swipe panel behind it paint through, which is BUG 1 */
@@ -330,7 +345,7 @@ const css = `
     background:linear-gradient(rgba(200,148,86,.06),rgba(200,148,86,.06)),#141d25}
   .lr-log-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
   .lr-log-name{font-size:11px;color:#eef3f7;font-weight:500;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .lr-log-time{font-size:9px;color:#56697b;flex-shrink:0}
+  .lr-log-time{font-size:9px;color:#c89456;flex-shrink:0}
   /* tier word, styled as the pill: colour at full strength on itself at 15%,
      both set inline from TIER_DOT_COLORS. nowrap so EMERGENCY never breaks. */
   .lr-log-tier{flex-shrink:0;white-space:nowrap;font-size:7.5px;letter-spacing:.08em;
@@ -340,34 +355,29 @@ const css = `
   .lr-log-problem{order:1;flex:0 0 100%;min-width:0;display:flex;align-items:baseline;
     gap:6px;line-height:1.3}
   .lr-log-problem-lbl{flex-shrink:0;font-size:7.5px;letter-spacing:1px;
-    text-transform:uppercase;color:#56697b}
+    text-transform:uppercase;color:#c89456}
   .lr-log-problem-val{min-width:0;font-size:9.5px;color:#7d8fa0;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .lr-log-chevron{font-size:10px;color:#56697b;flex-shrink:0}
-  /* swipe shell — inert on desktop, which gets no swipe actions this pass */
-  .lr-swipe{display:contents}
-  .lr-swipe-actions{display:none}
+  /* The reveal shell, shared. Mobile drags it with a finger, desktop slides it
+     on a click — same panel, same direction, same transition. */
+  .lr-swipe{display:block;position:relative;overflow:hidden;border-radius:3px;margin-bottom:4px}
+  .lr-swipe-actions{display:flex;position:absolute;top:0;right:0;bottom:0}
   .lr-swipe-btn{border:none;font-family:'DejaVu Sans Mono','Liberation Mono',monospace;
-    font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#eef3f7;cursor:pointer}
+    font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#eef3f7;
+    cursor:pointer;padding:0 12px;white-space:nowrap}
   .lr-swipe-btn.arch{background:#2b3a47}
   .lr-swipe-btn.del{background:#a33f35}
+  .lr-swipe-btn.rest{background:#2f5f8a}
   .lr-trash-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
     padding:8px 10px;margin-bottom:8px;border:1px solid rgba(220,91,78,.35);
     background:rgba(220,91,78,.06);border-radius:3px}
   .lr-trash-warn{font-size:10px;color:#f0a59b;line-height:1.4;flex:1;min-width:140px}
   .lr-view-btn.danger{border-color:#a33f35;color:#f0a59b;background:rgba(220,91,78,.12)}
-  /* mobile keeps an always-visible Restore; desktop puts it in the revealed
-     action strip instead, so a row shows nothing until it is asked to */
+  /* mobile keeps an always-visible Restore; desktop surfaces it in the reveal */
   .lr-restore{display:none;flex-shrink:0;background:none;border:1px solid #378add;
     color:#378add;font-size:8px;letter-spacing:1px;text-transform:uppercase;
     padding:3px 7px;border-radius:3px;cursor:pointer}
-  .lr-log-actions{order:2;flex:0 0 100%;display:flex;gap:6px;margin-top:4px}
-  .lr-log-act{font-family:'DejaVu Sans Mono','Liberation Mono',monospace;font-size:8px;
-    letter-spacing:1px;text-transform:uppercase;padding:3px 9px;border-radius:3px;
-    cursor:pointer;border:1px solid}
-  .lr-log-act.arch{border-color:#3a4a58;color:#aebfcc;background:rgba(43,58,71,.5)}
-  .lr-log-act.del{border-color:#a33f35;color:#f0a59b;background:rgba(163,63,53,.15)}
-  .lr-log-act.rest{border-color:#378add;color:#378add;background:rgba(55,138,221,.08)}
   .lr-restore:hover{background:rgba(55,138,221,.12)}
   /* view switcher lives in the log's own header row */
   .lr-log-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
@@ -568,22 +578,6 @@ const css = `
     .lr-log-item.open .lr-log-chevron{transform:translateY(-50%) rotate(90deg)}
 
     /* call log as stacked cards */
-    /* A date header is a control, but as bare grey text among grey labels it
-       read as a caption. Give it a surface, the amber the app already uses for
-       "you can act on this", and a 46px target — above the ~44px minimum a
-       fingertip needs, so it can be hit without aiming. */
-    .lr-log-group-hdr{padding:12px 14px;min-height:46px;gap:10px;
-      background:#141d25;border:1px solid #26333f;border-radius:6px;
-      margin-bottom:6px;transition:background .15s ease,border-color .15s ease,
-      transform .09s ease}
-    .lr-log-group-hdr .lr-log-group-label{color:#c89456;font-size:11px}
-    .lr-log-caret{font-size:10px;color:#c89456}
-    .lr-log-count{font-size:10px;color:#82a0ba;background:#0d141b;
-      border:1px solid #26333f;border-radius:10px;padding:2px 8px;line-height:1.4}
-    /* an open group is the one you are reading — mark it and drop the gap so
-       its rows read as belonging to it */
-    .lr-log-group-hdr[aria-expanded="true"]{background:rgba(200,148,86,.07);
-      border-color:rgba(200,148,86,.35);margin-bottom:8px}
     .lr-log-item{display:flex;align-items:center;gap:10px;position:relative;
       padding:11px 26px 11px 14px;margin-bottom:6px;
       -webkit-tap-highlight-color:transparent;
@@ -601,10 +595,10 @@ const css = `
     @media(prefers-reduced-motion:reduce){
       .lr-log-group-hdr:active,.lr-log-item:active{transform:none}
     }
-    /* the swipe shell owns the row's spacing and clips the action panel */
-    .lr-swipe{display:block;position:relative;overflow:hidden;border-radius:3px;margin-bottom:6px}
-    .lr-swipe-actions{display:flex;position:absolute;top:0;right:0;bottom:0;width:96px}
-    .lr-swipe-btn{flex:1}
+    /* mobile drags a fixed-width panel, so its threshold math stays put */
+    .lr-swipe{margin-bottom:6px}
+    .lr-swipe-actions{width:96px}
+    .lr-swipe-btn{flex:1;font-size:11px}
     /* pan-y keeps vertical scrolling with the browser and hands us the
        horizontal gesture, so the drag needs no preventDefault */
     .lr-log-item{display:flex;align-items:center;flex-wrap:wrap;row-gap:3px;gap:8px;
@@ -623,7 +617,6 @@ const css = `
     .lr-log-problem-val{font-size:11.5px}
     .lr-log-time{font-size:11px;line-height:1.2}
     .lr-restore{display:inline-block;font-size:10px;padding:4px 9px}
-    .lr-log-actions{display:none}          /* mobile reveals actions by swipe */
     .lr-log-views{gap:5px}
     .lr-view-btn{font-size:10px;padding:4px 9px}
     .lr-log-none{font-size:13px}
@@ -653,7 +646,19 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick, swipeAction, on
   const [dx, setDx] = useState(0);
   const openRef = React.useRef(false);
   const drag = React.useRef(null);
-  const swipeOn = !!swipeAction;
+  // One list feeds one panel. Mobile passes a single swipe action, desktop the
+  // per-view set; the reveal below is identical either way.
+  const acts = swipeAction ? [swipeAction] : (actions || []);
+  const swipeOn = acts.length > 0;
+  const panelRef = React.useRef(null);
+  const [panelW, setPanelW] = useState(0);
+  // Desktop's panel sizes to its buttons, so measure it rather than assuming —
+  // the archive view carries two actions where the log carries one.
+  React.useLayoutEffect(() => {
+    if (revealed && panelRef.current) setPanelW(panelRef.current.offsetWidth);
+  }, [revealed, acts.length]);
+  // touch drag or click reveal — same axis, same distance, same transition
+  const offset = revealed ? -panelW : dx;
 
   // touch-action:pan-y on the row lets the browser keep vertical scrolling
   // while handing us horizontal gestures, so no preventDefault is needed and
@@ -693,16 +698,19 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick, swipeAction, on
         // hidden and untappable until the row is actually displaced — an .active
         // row's tint is not fully opaque, so anything still painted here shows
         // through it and, sitting underneath, steals the tap without acting
-        <div className="lr-swipe-actions" aria-hidden={dx === 0}
-          style={{visibility: dx ? "visible" : "hidden", pointerEvents: dx ? "auto" : "none"}}>
-          <button type="button" className={`lr-swipe-btn ${swipeAction.cls}`}
-            tabIndex={dx === 0 ? -1 : 0}
-            onClick={e => {e.stopPropagation(); run(swipeAction.run);}}>{swipeAction.label}</button>
+        <div ref={panelRef} className="lr-swipe-actions" aria-hidden={!offset && !revealed}
+          style={{visibility: (offset || revealed) ? "visible" : "hidden",
+                  pointerEvents: (offset || revealed) ? "auto" : "none"}}>
+          {acts.map(a => (
+            <button key={a.label} type="button" className={`lr-swipe-btn ${a.cls}`}
+              tabIndex={(offset || revealed) ? 0 : -1}
+              onClick={e => {e.stopPropagation(); run(a.run);}}>{a.label}</button>
+          ))}
         </div>
       )}
       <div id={rowId} className={`lr-log-item${isActive?" active":""}${expanded?" open":""}`}
         style={{"--tier":dot,
-                transform: dx ? `translateX(${dx}px)` : undefined,
+                transform: offset ? `translateX(${offset}px)` : undefined,
                 transition: drag.current ? "none" : "transform .18s ease"}}
         onClick={handleClick}
         onTouchStart={onTouchStart} onTouchMove={onTouchMove}
@@ -724,15 +732,6 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick, swipeAction, on
             onClick={e => {e.stopPropagation(); onRestore(call);}}>Restore</button>
         )}
         <span className="lr-log-chevron">›</span>
-        {/* desktop only — revealed by a second click on an already-open row */}
-        {revealed && actions && actions.length > 0 && (
-          <div className="lr-log-actions">
-            {actions.map(a => (
-              <button key={a.label} type="button" className={`lr-log-act ${a.cls}`}
-                onClick={e => {e.stopPropagation(); a.run(call);}}>{a.label}</button>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
