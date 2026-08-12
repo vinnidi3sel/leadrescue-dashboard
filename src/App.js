@@ -1045,7 +1045,10 @@ function Report({ call, rptNum, imageUrl:imageOverride }) {
     cleanField(addrParts[0]),
     cleanField(addrParts.slice(1).join(","))
   ].filter(Boolean).join(", ");
-  const quote = timingQuote(d.callback?.note, 40);
+  // 60, not 40: at 40 most real quotes were cut mid-phrase — "Preferably, in the
+  // morning, on the…" — and an ellipsis landing there reads as a rendering fault
+  // rather than as an abbreviation. Anything past 60 still cuts on a word.
+  const quote = timingQuote(d.callback?.note, 60);
   const imageUrl = imageOverride ?? call.image_url ?? null;
 
   return (
