@@ -337,12 +337,21 @@ const css = `
      rows read as belonging to it */
   .lr-log-group-hdr[aria-expanded="true"]{background:rgba(200,148,86,.07);
     border-color:rgba(200,148,86,.35);margin-bottom:8px}
+  /* A collapsed group is an index entry, not a card: it needs to fit its label,
+     arrow and count and nothing more. The 46px finger target only has to hold
+     for the header you are actually working with. */
+  .lr-log-group-hdr[aria-expanded="false"]{min-height:28px;padding:4px 14px;margin-bottom:4px}
+  .lr-log-group-hdr[aria-expanded="false"] .lr-log-count{padding:1px 7px}
   .lr-log-item{display:flex;align-items:center;flex-wrap:wrap;row-gap:3px;gap:8px;padding:8px 10px;border:1px solid #21303b;border-radius:3px;background:#141d25;cursor:pointer;transition:border-color .15s}
   .lr-log-item:hover{border-color:#2b3a47}
-  /* layered over the opaque base rather than replacing it — a translucent row
-     let the swipe panel behind it paint through, which is BUG 1 */
-  .lr-log-item.active{border-color:#c89456;
-    background:linear-gradient(rgba(200,148,86,.06),rgba(200,148,86,.06)),#141d25}
+  /* Selection wears the row's own tier colour rather than a single amber, so a
+     glance at the open row says which tier it is. Both come from TIER_DOT_COLORS
+     via the inline --tier / --tier-fill; the amber values remain as fallbacks.
+     Layered over the opaque base rather than replacing it — a translucent row
+     let the swipe panel behind it paint through, which is BUG 1. */
+  .lr-log-item.active{border-color:var(--tier,#c89456);
+    background:linear-gradient(var(--tier-fill,rgba(200,148,86,.06)),
+      var(--tier-fill,rgba(200,148,86,.06))),#141d25}
   .lr-log-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
   .lr-log-name{font-size:11px;color:#eef3f7;font-weight:500;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .lr-log-time{font-size:9px;color:#c89456;flex-shrink:0}
@@ -410,8 +419,9 @@ const css = `
   .lr-day.on{background:rgba(200,148,86,.2);border-color:#c89456}
   .lr-day.on .dl{color:#e6b074}
   .lr-tier{display:flex;align-items:center;gap:6px;padding:3px 7px;border-radius:3px;border:1px solid #21303b;background:#0d141b;opacity:.35;margin-bottom:3px}
-  .lr-tier.active{opacity:1;border-left-width:3px;padding:7px 9px;align-items:flex-start}
-  .lr-tier.active .tdot{margin-top:4px}
+  /* centred, not flex-start: the tier name sat at the top of the row with dead
+     space under it whenever the reason wrapped to a second or third line */
+  .lr-tier.active{opacity:1;border-left-width:3px;padding:7px 9px;align-items:center}
   .lr-tier.active .tn{font-size:9px}
   .lr-tier.active .tr{font-size:10.5px;line-height:1.45}
   .lr-tier .tdot{width:5px;height:5px;border-radius:50%;flex-shrink:0;background:#21303b}
@@ -573,8 +583,9 @@ const css = `
     .rpt-lead-meta{display:block;float:right;max-width:48%;margin:0 0 4px 12px;
       text-align:right;line-height:1.7;color:#56697b;text-transform:uppercase;letter-spacing:.5px}
 
-    .lr-log-item.open{border-color:#c89456;
-      background:linear-gradient(rgba(200,148,86,.06),rgba(200,148,86,.06)),#141d25}
+    .lr-log-item.open{border-color:var(--tier,#c89456);
+      background:linear-gradient(var(--tier-fill,rgba(200,148,86,.06)),
+        var(--tier-fill,rgba(200,148,86,.06))),#141d25}
     .lr-log-item.open .lr-log-chevron{transform:translateY(-50%) rotate(90deg)}
 
     /* call log as stacked cards */
@@ -709,7 +720,7 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick, swipeAction, on
         </div>
       )}
       <div id={rowId} className={`lr-log-item${isActive?" active":""}${expanded?" open":""}`}
-        style={{"--tier":dot,
+        style={{"--tier":dot, "--tier-fill":`rgba(${hexToRgb(dot)},.06)`,
                 transform: offset ? `translateX(${offset}px)` : undefined,
                 transition: drag.current ? "none" : "transform .18s ease"}}
         onClick={handleClick}
