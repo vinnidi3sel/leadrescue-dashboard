@@ -393,11 +393,14 @@ const css = `
   .lr-swipe-btn.arch{background:#2b3a47}
   .lr-swipe-btn.del{background:#a33f35}
   .lr-swipe-btn.rest{background:#2f5f8a}
-  .lr-trash-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
-    padding:8px 10px;margin-bottom:8px;border:1px solid rgba(220,91,78,.35);
-    background:rgba(220,91,78,.06);border-radius:3px}
-  .lr-trash-warn{font-size:10px;color:#f0a59b;line-height:1.4;flex:1;min-width:140px}
-  .lr-view-btn.danger{border-color:#a33f35;color:#f0a59b;background:rgba(220,91,78,.12)}
+  /* sized for the longer of its two labels, in ch because the face is monospace,
+     so arming the confirmation swaps the text without moving the row */
+  .lr-swipe-btn.wide{min-width:16ch}
+  .lr-swipe-btn.armed{background:#c2483c;font-weight:700}
+  /* plain destructive text, not a button in a box — it sits on the count row */
+  .lr-danger-link{margin-left:auto;background:none;border:none;padding:0 2px;
+    color:#f0a59b;font-size:8px;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+  .lr-danger-link:hover{text-decoration:underline}
   /* view switcher lives in the log's own header row */
   .lr-log-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
   .lr-log-head .lr-log-label{margin-bottom:0}
@@ -644,7 +647,7 @@ const css = `
     /* mobile drags a fixed-width panel, so its threshold math stays put */
     .lr-swipe{margin-bottom:6px}
     .lr-swipe-actions{width:var(--swipe-w,96px)}
-    .lr-swipe-btn{flex:1;font-size:11px}
+    .lr-swipe-btn{flex:1;font-size:10px}
     /* pan-y keeps vertical scrolling with the browser and hands us the
        horizontal gesture, so the drag needs no preventDefault */
     .lr-log-item{display:flex;align-items:center;flex-wrap:wrap;row-gap:3px;gap:8px;
@@ -662,6 +665,7 @@ const css = `
     .lr-log-problem-lbl{font-size:9px}
     .lr-log-problem-val{font-size:11.5px}
     .lr-log-time{font-size:11px;line-height:1.2}
+    .lr-danger-link{font-size:10px}
     .lr-log-views{gap:5px}
     .lr-view-btn{font-size:10px;padding:4px 9px}
     .lr-log-none{font-size:13px}
@@ -691,9 +695,12 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick, revealed, actio
   // One list feeds one panel on both platforms; only the trigger differs.
   const acts = actions || [];
   const swipeOn = acts.length > 0;
-  // A single action reveals 96px; a pair shares 168px, which still leaves the
-  // caller name and time readable on a 375px row.
-  const swipeW = acts.length > 1 ? 168 : 96;
+  // A single action reveals 96px; a pair shares 200px, enough for the longest
+  // label ("Confirm delete?") while leaving the caller name and time readable.
+  const swipeW = acts.length > 1 ? 200 : 96;   // two labels need the extra room
+  // Which action is waiting for its second tap. Only the irreversible one asks,
+  // and it asks on the button itself rather than in a dialog.
+  const [armed, setArmed] = useState(null);
   const panelRef = React.useRef(null);
   const [panelW, setPanelW] = useState(0);
   // Desktop's panel sizes to its buttons, so measure it rather than assuming —
@@ -703,6 +710,9 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick, revealed, actio
   }, [revealed, acts.length]);
   // touch drag or click reveal — same axis, same distance, same transition
   const offset = revealed ? -panelW : dx;
+  // closing the panel — by tap, by swiping back, or by opening another row —
+  // cancels a pending confirmation rather than leaving it armed out of sight
+  React.useEffect(() => { if (!offset && !revealed) setArmed(null); }, [offset, revealed]);
 
   // touch-action:pan-y on the row lets the browser keep vertical scrolling
   // while handing us horizontal gestures, so no preventDefault is needed and
@@ -734,7 +744,7 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick, revealed, actio
     if (openRef.current || dx !== 0) { openRef.current = false; setDx(0); return; }
     onClick();
   }
-  function run(fn) { openRef.current = false; setDx(0); fn(call); }
+  function run(fn) { openRef.current = false; setDx(0); setArmed(null); fn(call); }
 
   return (
     <div className="lr-swipe" style={{"--swipe-w":`${swipeW}px`}}>
@@ -746,9 +756,15 @@ function CallLogItem({ call, isActive, expanded, rowId, onClick, revealed, actio
           style={{visibility: (offset || revealed) ? "visible" : "hidden",
                   pointerEvents: (offset || revealed) ? "auto" : "none"}}>
           {acts.map(a => (
-            <button key={a.label} type="button" className={`lr-swipe-btn ${a.cls}`}
+            <button key={a.label} type="button"
+              className={`lr-swipe-btn ${a.cls}${armed === a.label ? " armed" : ""}`}
               tabIndex={(offset || revealed) ? 0 : -1}
-              onClick={e => {e.stopPropagation(); run(a.run);}}>{a.label}</button>
+              onClick={e => {
+                e.stopPropagation();
+                // first tap on an irreversible action only arms it
+                if (a.confirm && armed !== a.label) { setArmed(a.label); return; }
+                run(a.run);
+              }}>{armed === a.label ? a.confirm : a.label}</button>
           ))}
         </div>
       )}
@@ -792,6 +808,7 @@ function CallLog({ calls, selectedId, onSelect, accordion=false, expandedId=null
   // date label -> bool. Absent = use the default (Today open, everything else collapsed).
   const [openOverrides, setOpenOverrides] = useState({});
   const [confirmEmpty, setConfirmEmpty] = useState(false);
+  useEffect(() => { setConfirmEmpty(false); }, [view]);
   // desktop: which row has its actions showing (one at a time, null = none)
   const [revealedId, setRevealedId] = useState(null);
   const currentId = accordion ? expandedId : selectedId;
@@ -808,6 +825,17 @@ function CallLog({ calls, selectedId, onSelect, accordion=false, expandedId=null
     <div className="lr-log">
       <div className="lr-log-head">
         <div className="lr-log-label lr-mono">{LOG_LABEL[view](calls.length)}</div>
+        {/* inline beside the count rather than in a container of its own — a
+            bordered box here read as a second card above the day headers */}
+        {view === "trash" && calls.length > 0 && onEmptyTrash && (
+          <button type="button" className="lr-danger-link lr-mono"
+            onClick={()=>{
+              if (!confirmEmpty) { setConfirmEmpty(true); return; }
+              setConfirmEmpty(false); onEmptyTrash();
+            }}>
+            {confirmEmpty ? `Delete all ${calls.length}?` : "Empty trash"}
+          </button>
+        )}
         {onViewChange && (
           <div className="lr-log-views">
             {LOG_VIEWS.map(([key,label]) => (
@@ -819,24 +847,6 @@ function CallLog({ calls, selectedId, onSelect, accordion=false, expandedId=null
           </div>
         )}
       </div>
-      {view === "trash" && calls.length > 0 && (
-        <div className="lr-trash-bar">
-          {confirmEmpty ? (
-            <>
-              <span className="lr-trash-warn lr-mono">
-                Permanently delete {calls.length} report{calls.length!==1?"s":""}? This cannot be undone.
-              </span>
-              <button type="button" className="lr-view-btn lr-mono danger"
-                onClick={()=>{setConfirmEmpty(false); onEmptyTrash && onEmptyTrash();}}>Delete forever</button>
-              <button type="button" className="lr-view-btn lr-mono"
-                onClick={()=>setConfirmEmpty(false)}>Cancel</button>
-            </>
-          ) : (
-            <button type="button" className="lr-view-btn lr-mono"
-              onClick={()=>setConfirmEmpty(true)}>Empty trash</button>
-          )}
-        </div>
-      )}
       {calls.length === 0 && <div className="lr-log-none lr-mono">{EMPTY_VIEW[view]}</div>}
       {groups.map(([date, items], groupIdx) => {
         const hasCurrent = items.some(c => c.id === currentId);
@@ -1334,10 +1344,32 @@ export default function App() {
 
   const archiveCall = React.useCallback(c => patchCall(c, {archived_at: new Date().toISOString()}), [patchCall]);
   const deleteCall  = React.useCallback(c => patchCall(c, {deleted_at:  new Date().toISOString()}), [patchCall]);
-  const restoreCall = React.useCallback(c => patchCall(c, view==="trash" ? {deleted_at:null} : {archived_at:null}), [patchCall, view]);
+  // Restore means "back to the log", not "back one step". From Trash that has to
+  // clear archived_at too: a row only reaches Trash via Archive, so leaving it set
+  // would drop the row into Archive and leave the caller hunting for it.
+  const restoreCall = React.useCallback(
+    c => patchCall(c, view==="trash" ? {deleted_at:null, archived_at:null} : {archived_at:null}),
+    [patchCall, view]);
 
-  // The only hard delete in the app. Everything else is a timestamp that can be
-  // nulled again; this removes the rows. Guarded by a confirm in the trash bar.
+  // Permanently removes one row. Guarded by an in-place confirm on the button
+  // itself, since it is the one action with nothing to undo it.
+  const hardDeleteCall = React.useCallback(call => {
+    const before = calls;
+    setCalls(cs => cs.filter(c => c.id !== call.id));
+    setSelected(sel => sel && sel.id===call.id ? null : sel);
+    setMobileOpenId(id => id===call.id ? null : id);
+    fetch(`https://xofgjzfofmjziycqprhq.supabase.co/rest/v1/calls?id=eq.${call.id}`, {
+      method: "DELETE",
+      cache: "no-store",
+      headers: {apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}`, Prefer: "return=minimal"}
+    })
+    .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); })
+    .catch(() => { setCalls(before); });
+  }, [calls]);
+
+  // Clears the whole of Trash. Everything else is a timestamp that can be
+  // nulled again; this removes the rows. Guarded by the two-step confirm on the
+  // Empty trash control.
   const emptyTrash = React.useCallback(() => {
     const before = calls;
     if (!calls.some(c => c.deleted_at)) return;
@@ -1357,7 +1389,9 @@ export default function App() {
       view === "log"     ? [{label:"Archive", cls:"arch", run:archiveCall}]
     : view === "archive" ? [{label:"Restore", cls:"rest", run:restoreCall},
                             {label:"Delete",  cls:"del",  run:deleteCall}]
-    :                      [{label:"Restore", cls:"rest", run:restoreCall}];
+    :                      [{label:"Restore", cls:"rest", run:restoreCall},
+                            {label:"Delete forever", cls:"del wide", run:hardDeleteCall,
+                             confirm:"Confirm delete?"}];
 
   const loadCalls = React.useCallback(() => {
     // No tenant, no request.
@@ -1467,9 +1501,12 @@ export default function App() {
     </div>
   );
 
-  // archived and deleted rows leave the main log; each has its own view
+  // Archived and deleted rows leave the main log; each has its own view.
+  // Deleting from Archive sets deleted_at but leaves archived_at, so an archive
+  // predicate of "archived_at is set" kept the row here and showed it in Trash
+  // at the same time. Trash outranks Archive: a deleted row is only ever in Trash.
   const visibleCalls = calls.filter(c =>
-      view === "archive" ? !!c.archived_at
+      view === "archive" ? (!!c.archived_at && !c.deleted_at)
     : view === "trash"   ? !!c.deleted_at
     : !c.archived_at && !c.deleted_at);
 
