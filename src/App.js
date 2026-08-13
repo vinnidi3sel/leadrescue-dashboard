@@ -461,11 +461,16 @@ const css = `
   .lr-day.on{background:rgba(200,148,86,.2);border-color:#c89456}
   .lr-day.on .dl{color:#e6b074}
   .lr-tier{display:flex;align-items:center;gap:6px;padding:3px 7px;border-radius:3px;border:1px solid #21303b;background:#0d141b;opacity:.35;margin-bottom:3px}
-  /* centred, not flex-start: the tier name sat at the top of the row with dead
-     space under it whenever the reason wrapped to a second or third line */
-  .lr-tier.active{opacity:1;border-left-width:3px;padding:7px 9px;align-items:center}
+  /* The reason drops to its own line: flex-basis 100% breaks it onto a second
+     row, leaving the dot and the tier name alone on the first. It gets the full
+     card width instead of a narrow column beside the label, so most reasons now
+     fit on one line and the two stop competing for the same glance. The explicit
+     align-items is gone with the side-by-side layout it was propping up — the
+     base rule already centres the dot against the name. */
+  .lr-tier.active{opacity:1;border-left-width:3px;padding:7px 9px;flex-wrap:wrap}
   .lr-tier.active .tn{font-size:9px}
-  .lr-tier.active .tr{font-size:10.5px;line-height:1.45}
+  .lr-tier.active .tr{flex:0 0 100%;min-width:0;margin-top:3px;
+    font-size:10.5px;line-height:1.45;overflow-wrap:anywhere}
   .lr-tier .tdot{width:5px;height:5px;border-radius:50%;flex-shrink:0;background:#21303b}
   .lr-tier .tn{font-size:7.5px;letter-spacing:1.5px;font-weight:700;text-transform:uppercase;color:#56697b}
   .lr-tier .tr{font-size:7.5px;color:#aebfcc}
