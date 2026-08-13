@@ -1344,11 +1344,13 @@ export default function App() {
 
   const archiveCall = React.useCallback(c => patchCall(c, {archived_at: new Date().toISOString()}), [patchCall]);
   const deleteCall  = React.useCallback(c => patchCall(c, {deleted_at:  new Date().toISOString()}), [patchCall]);
-  // Restore means "back to the log", not "back one step". From Trash that has to
-  // clear archived_at too: a row only reaches Trash via Archive, so leaving it set
-  // would drop the row into Archive and leave the caller hunting for it.
+  // Restore undoes one stage, not the whole journey. Archiving and deleting are
+  // separate decisions, so undoing the delete leaves the archive decision alone:
+  // a row archived before it was deleted returns to Archive, and one that went
+  // straight from the log to Trash returns to the log, since archived_at was
+  // never set on it.
   const restoreCall = React.useCallback(
-    c => patchCall(c, view==="trash" ? {deleted_at:null, archived_at:null} : {archived_at:null}),
+    c => patchCall(c, view==="trash" ? {deleted_at:null} : {archived_at:null}),
     [patchCall, view]);
 
   // Permanently removes one row. Guarded by an in-place confirm on the button
