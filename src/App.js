@@ -431,9 +431,22 @@ const css = `
   .rpt-phone-row .field-icon{font-size:14px}
   .rpt-phone{font-size:clamp(15px,4.2vw,19px);color:#eef3f7;font-weight:700;
     line-height:1.2;letter-spacing:.5px}
+  /* Same card as Tone read and Dispatch note — identical padding, background,
+     radius and 2px left border — so the three read as one family in amber,
+     green and steel. Steel is #82a0ba rather than the brighter #378add on
+     purpose: #378add is the Standard tier colour, and a blue rule here would
+     read as a priority signal. */
+  .rpt-reach-card{padding:5px 7px;background:#0d141b;
+    border:1px solid rgba(130,160,186,.2);border-left:2px solid #82a0ba;
+    border-radius:2px;margin-top:2px}
   /* Parsed time and preference, one line. Short enough now that it needs no
      flex gymnastics — the quote it used to compete with has its own line. */
   .rpt-reach{margin-top:1px;font-size:10px;color:#82a0ba;line-height:1.35}
+  /* "when can I call this person" is the question the card answers, so the time
+     is the one bright, large thing in it — the preference and the quote qualify
+     it and stay dim. */
+  .rpt-reach-time{font-size:clamp(12px,3vw,14px);color:#eef3f7;font-weight:700;
+    letter-spacing:.3px}
   .rpt-reach-sep{color:#56697b;margin:0 5px}
   /* The caller's own words, whole. Wraps to as many lines as it takes. */
   .rpt-quote-line{margin-top:4px;font-size:10px;color:#82a0ba;font-style:italic;
@@ -524,6 +537,7 @@ const css = `
     .rpt-phone{font-size:17px}
     .rpt-phone-row .field-icon{font-size:15px}
     .rpt-reach{font-size:12px}
+    .rpt-reach-time{font-size:16px}
     .rpt-quote-line{font-size:12px}
     /* street on one line, city and state on the next: joined, the two wrapped
        awkwardly mid-address at this width */
@@ -1121,13 +1135,14 @@ function Report({ call, rptNum, imageUrl:imageOverride }) {
                 </div>
               </div>
 
-              {/* Timing is its own labelled block: parsed value and preference on
-                  one line, the days beneath when they narrow anything, then the
-                  caller's own words in full on a line of their own. */}
+              {/* Timing as a card in the same family as Tone read and Dispatch
+                  note: parsed value and preference on one line, the days beneath
+                  when they narrow anything, then the caller's own words in full. */}
               <div style={{gridColumn:"1 / -1"}}>
-                <span className="field-lbl lr-mono">Best time to reach</span>
+                <div className="rpt-reach-card">
+                <div className="sec-title lr-mono fs-8" style={{marginBottom:2,color:"#82a0ba"}}><Icon name="clock"/> Best time to reach</div>
                 <div className="rpt-reach lr-mono">
-                  <span>{d.callback?.time||"Anytime"}</span>
+                  <span className="rpt-reach-time">{d.callback?.time||"Anytime"}</span>
                   {prefers && <span className="rpt-reach-sep">·</span>}
                   {prefers && <span>{prefers}</span>}
                 </div>
@@ -1142,6 +1157,7 @@ function Report({ call, rptNum, imageUrl:imageOverride }) {
                   </div>
                 )}
                 {quote && <div className="rpt-quote-line">"{quote}"</div>}
+                </div>
               </div>
 
               {/* separates "how to reach them" from "where is it" */}
