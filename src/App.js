@@ -110,15 +110,41 @@ function cleanField(v) {
   return (!t || NOT_PROVIDED.test(t)) ? "" : t;
 }
 
-// "Call or text" / "Text" / "phone" -> "prefers call or text" / "prefers text".
-// Returns "" when the caller never said, so the mid-dot can be dropped with it.
-function prefersPhrase(pref) {
+// Badge wording. "" when the caller never said, so the pill drops with it.
+function prefersLabel(pref) {
   const v = (pref||"").toLowerCase();
   const call = /call|phone|voice/.test(v), text = /text|sms|message/.test(v);
-  if (call && text) return "prefers call or text";
-  if (text) return "prefers text";
-  if (call) return "prefers call";
+  if (call && text) return "Call or text";
+  if (text) return "Prefers text";
+  if (call) return "Prefers call";
   return "";
+}
+
+// Time references inside a caller's own words. Deliberately conservative: a bare
+// number only counts when a preposition or a range makes it a time, so "two kids"
+// stays plain while "around 7 or 8", "after five" and "mornings" do not.
+const NUMWORD = "one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve";
+const CLOCK = "\\d{1,2}(?::\\d{2})?";
+const MERIDIEM = "(?:\\s*(?:am|pm|a\\.m\\.|p\\.m\\.))?";
+const TIME_RE = new RegExp("(" + [
+  `\\b${CLOCK}\\s*(?:am|pm|a\\.m\\.|p\\.m\\.)`,
+  `\\b(?:at|by|after|before|around|about|til|till|until|past|from)\\s+(?:${CLOCK}|${NUMWORD})(?:\\s*(?:or|to|and|[-\u2013])\\s*(?:${CLOCK}|${NUMWORD}))?${MERIDIEM}`,
+  `\\b(?:${NUMWORD})\\s+(?:or|to)\\s+(?:${NUMWORD})\\b`,
+  "\\b(?:mornings?|afternoons?|evenings?|nights?|noon|midday|midnight|weekends?|weekdays?|today|tomorrow|tonight|mondays?|tuesdays?|wednesdays?|thursdays?|fridays?|saturdays?|sundays?)\\b"
+].join("|") + ")", "gi");
+
+function boldTimes(text) {
+  const out = [];
+  let last = 0, m;
+  TIME_RE.lastIndex = 0;
+  while ((m = TIME_RE.exec(text)) !== null) {
+    if (!m[0]) { TIME_RE.lastIndex++; continue; }
+    if (m.index > last) out.push(text.slice(last, m.index));
+    out.push(<strong key={m.index} className="rpt-when">{m[0]}</strong>);
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
 }
 
 function hexToRgb(hex) {
@@ -315,6 +341,7 @@ const css = `
   html,body{background:#0b1014;margin:0}
   .lr-app{background:#0b1014;min-height:100vh;font-family:'Liberation Sans','DejaVu Sans',Arial,sans-serif}
   .lr-mono{font-family:'DejaVu Sans Mono','Liberation Mono',monospace}
+  .lr-sans{font-family:'Liberation Sans','DejaVu Sans',Arial,sans-serif}
   .lr-serif{font-family:'Liberation Serif','DejaVu Serif',Georgia,serif}
   .lr-nav{background:#101921;border-bottom:1px solid #2b3a47;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
   .lr-nav-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid #5cb083;background:rgba(92,176,131,.1);border-radius:2px}
@@ -378,8 +405,11 @@ const css = `
      to itself. The label holds its width; only the value ellipsises. */
   .lr-log-problem{order:1;flex:0 0 100%;min-width:0;display:flex;align-items:baseline;
     gap:6px;line-height:1.3}
+  /* a faint box behind the label alone, so it reads as a tag rather than as more
+     of the sentence next to it */
   .lr-log-problem-lbl{flex-shrink:0;font-size:7.5px;letter-spacing:1px;
-    text-transform:uppercase;color:#eef3f7}
+    text-transform:uppercase;color:#eef3f7;padding:1px 5px;border-radius:3px;
+    border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05)}
   .lr-log-problem-val{min-width:0;font-size:9.5px;color:#eef3f7;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .lr-log-chevron{font-size:10px;color:#56697b;flex-shrink:0}
@@ -441,16 +471,25 @@ const css = `
     border-radius:2px;margin-top:2px}
   /* Parsed time and preference, one line. Short enough now that it needs no
      flex gymnastics — the quote it used to compete with has its own line. */
-  .rpt-reach{margin-top:1px;font-size:10px;color:#82a0ba;line-height:1.35}
+  .rpt-reach{display:flex;align-items:center;flex-wrap:wrap;gap:8px;
+    margin-top:1px;font-size:10px;color:#82a0ba;line-height:1.35}
   /* "when can I call this person" is the question the card answers, so the time
      is the one bright, large thing in it — the preference and the quote qualify
      it and stay dim. */
   .rpt-reach-time{font-size:clamp(12px,3vw,14px);color:#eef3f7;font-weight:700;
     letter-spacing:.3px}
-  .rpt-reach-sep{color:#56697b;margin:0 5px}
+  /* Same recipe as the RECOVERED badge — 1px rule, its own colour at 10%, 2px
+     radius, uppercase and tracked — in the card's steel rather than that badge's
+     green, and with the padding scaled down to sit inside a 5px-padded card. */
+  .rpt-prefers{display:inline-flex;align-items:center;flex-shrink:0;
+    padding:3px 8px;border:1px solid #82a0ba;background:rgba(130,160,186,.1);
+    border-radius:2px;letter-spacing:2px;text-transform:uppercase;
+    font-weight:700;color:#82a0ba;line-height:1.2}
   /* The caller's own words, whole. Wraps to as many lines as it takes. */
-  .rpt-quote-line{margin-top:4px;font-size:10px;color:#82a0ba;font-style:italic;
+  .rpt-quote-line{font-size:10px;color:#82a0ba;font-style:italic;
     line-height:1.45;overflow-wrap:anywhere}
+  /* the timing the caller actually named, lifted out of their sentence */
+  .rpt-when{color:#eef3f7;font-weight:700;font-style:normal}
   /* Desktop joins the two address halves into one line; the comma belongs to the
      second half, so it disappears with it when there is no city or state. */
   .rpt-addr-2::before{content:", "}
@@ -467,10 +506,13 @@ const css = `
      fit on one line and the two stop competing for the same glance. The explicit
      align-items is gone with the side-by-side layout it was propping up — the
      base rule already centres the dot against the name. */
-  .lr-tier.active{opacity:1;border-left-width:3px;padding:7px 9px;flex-wrap:wrap}
-  .lr-tier.active .tn{font-size:9px}
-  .lr-tier.active .tr{flex:0 0 100%;min-width:0;margin-top:3px;
-    font-size:10.5px;line-height:1.45;overflow-wrap:anywhere}
+  .lr-tier.active{opacity:1;border-left-width:3px;padding:5px 9px;flex-wrap:wrap}
+  /* the tier is the headline of its card, so it is set larger and spread wide */
+  .lr-tier.active .tn{font-size:12px;letter-spacing:4px}
+  /* the reason moves to the body face: at the same size it sets far shorter than
+     monospace, which buys back the height the larger tier name costs */
+  .lr-tier.active .tr{flex:0 0 100%;min-width:0;margin-top:2px;
+    font-size:10.5px;line-height:1.4;overflow-wrap:anywhere}
   .lr-tier .tdot{width:5px;height:5px;border-radius:50%;flex-shrink:0;background:#21303b}
   .lr-tier .tn{font-size:7.5px;letter-spacing:1.5px;font-weight:700;text-transform:uppercase;color:#56697b}
   .lr-tier .tr{font-size:7.5px;color:#aebfcc}
@@ -574,8 +616,8 @@ const css = `
     .lr-log-count{font-size:10px;padding:1px 7px}
     .lr-tier .tn{font-size:10px}
     .lr-tier .tr{font-size:10px}
-    .lr-tier.active .tn{font-size:11.5px}
-    .lr-tier.active .tr{font-size:13px;line-height:1.45}
+    .lr-tier.active .tn{font-size:14px;letter-spacing:4px}
+    .lr-tier.active .tr{font-size:13px;line-height:1.4}
     .lr-day{width:26px;height:26px}
     .lr-day .dl{font-size:10px}
     .ai-img-label{font-size:9px}
@@ -1052,7 +1094,7 @@ function Report({ call, rptNum, imageUrl:imageOverride }) {
   const tc = TIER_COLORS[tier] || TIER_COLORS.Standard;
   const days = d.callback?.days || [];
   const dayCount = DAY_KEYS.filter(dk => isDayActive(dk, days)).length;
-  const prefers = prefersPhrase(d.lead?.preferred_contact);
+  const prefers = prefersLabel(d.lead?.preferred_contact);
   // Split in two so the platforms can differ: one line on desktop, two on a
   // phone. Each half is filtered, so an absent city or state leaves neither a
   // blank row nor a dangling comma.
@@ -1146,10 +1188,11 @@ function Report({ call, rptNum, imageUrl:imageOverride }) {
               <div style={{gridColumn:"1 / -1"}}>
                 <div className="rpt-reach-card">
                 <div className="sec-title lr-mono fs-8" style={{marginBottom:2,color:"#82a0ba"}}><Icon name="clock"/> Best time to reach</div>
-                <div className="rpt-reach lr-mono">
-                  <span className="rpt-reach-time">{d.callback?.time||"Anytime"}</span>
-                  {prefers && <span className="rpt-reach-sep">·</span>}
-                  {prefers && <span>{prefers}</span>}
+                <div className="rpt-reach">
+                  {/* body face, not the phone number's monospace — at this size
+                      the mono read as a second number rather than as a time */}
+                  <span className="rpt-reach-time lr-sans">{d.callback?.time||"Anytime"}</span>
+                  {prefers && <span className="rpt-prefers lr-mono fs-8">{prefers}</span>}
                 </div>
                 {/* All seven lit says "any day", which is what no answer looks
                     like — so the strip only earns its space when it narrows things. */}
@@ -1161,7 +1204,12 @@ function Report({ call, rptNum, imageUrl:imageOverride }) {
                     })}
                   </div>
                 )}
-                {quote && <div className="rpt-quote-line">"{quote}"</div>}
+                {quote && (
+                  <div style={{marginTop:5}}>
+                    <span className="field-lbl lr-mono">In their words</span>
+                    <div className="rpt-quote-line">"{boldTimes(quote)}"</div>
+                  </div>
+                )}
                 </div>
               </div>
 
@@ -1213,7 +1261,7 @@ function Report({ call, rptNum, imageUrl:imageOverride }) {
                     <span className="tdot" style={isActive?{background:c.dot,boxShadow:`0 0 5px ${c.dot}`}:{}}/>
                     <span className="tn" style={{color:isActive?c.text:"#56697b"}}>{t.toUpperCase()}</span>
                     {isActive && (
-                      <span className="tr" title={d.priority?.reason||""}>
+                      <span className="tr lr-sans" title={d.priority?.reason||""}>
                         {/* same de-duplication as the log row, but the report
                             has room, so fall back to the full reason rather
                             than showing an empty tier line */}
