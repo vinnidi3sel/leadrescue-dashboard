@@ -469,25 +469,29 @@ const css = `
   .rpt-reach-card{padding:5px 7px;background:#0d141b;
     border:1px solid rgba(130,160,186,.2);border-left:2px solid #82a0ba;
     border-radius:2px;margin-top:2px}
-  /* Parsed time and preference, one line. Short enough now that it needs no
-     flex gymnastics — the quote it used to compete with has its own line. */
-  .rpt-reach{display:flex;align-items:center;flex-wrap:wrap;gap:8px;
-    margin-top:1px;font-size:10px;color:#82a0ba;line-height:1.35}
+  /* the badge has moved to the phone row, so this is the time value alone */
+  .rpt-reach{margin-top:5px;font-size:10px;color:#82a0ba;line-height:1.35}
   /* "when can I call this person" is the question the card answers, so the time
      is the one bright, large thing in it — the preference and the quote qualify
      it and stay dim. */
   .rpt-reach-time{font-size:clamp(12px,3vw,14px);color:#eef3f7;font-weight:700;
     letter-spacing:.3px}
-  /* Same recipe as the RECOVERED badge — 1px rule, its own colour at 10%, 2px
-     radius, uppercase and tracked — in the card's steel rather than that badge's
-     green, and with the padding scaled down to sit inside a 5px-padded card. */
+  /* Same recipe as the RECOVERED badge — 1px rule, a 10% fill, 2px radius,
+     uppercase and tracked — but in the call's own tier colour, set inline. */
   .rpt-prefers{display:inline-flex;align-items:center;flex-shrink:0;
-    padding:3px 8px;border:1px solid #82a0ba;background:rgba(130,160,186,.1);
-    border-radius:2px;letter-spacing:2px;text-transform:uppercase;
-    font-weight:700;color:#82a0ba;line-height:1.2}
+    padding:3px 8px;border:1px solid;border-radius:2px;letter-spacing:2px;
+    text-transform:uppercase;font-weight:700;line-height:1.2;margin-top:2px}
+  /* phone and preferred contact share a row, split by a hairline */
+  .rpt-phone-head{display:flex;align-items:flex-start;gap:12px}
+  .rpt-phone-main{min-width:0;flex:1 1 auto}
+  .rpt-pref-col{flex:0 0 auto;padding-left:12px;border-left:1px solid #21303b;
+    display:flex;flex-direction:column;align-items:flex-start}
   /* The caller's own words, whole. Wraps to as many lines as it takes. */
-  .rpt-quote-line{font-size:10px;color:#82a0ba;font-style:italic;
+  .rpt-quote-line{margin-top:4px;font-size:10px;color:#82a0ba;font-style:italic;
     line-height:1.45;overflow-wrap:anywhere}
+  /* the quote is a section of the card, not a stray line: same label treatment
+     as the card's own heading, set apart from the time value above it */
+  .rpt-quote-block{margin-top:9px}
   /* the timing the caller actually named, lifted out of their sentence */
   .rpt-when{color:#eef3f7;font-weight:700;font-style:normal}
   /* Desktop joins the two address halves into one line; the comma belongs to the
@@ -511,7 +515,7 @@ const css = `
   .lr-tier.active .tn{font-size:12px;letter-spacing:4px}
   /* the reason moves to the body face: at the same size it sets far shorter than
      monospace, which buys back the height the larger tier name costs */
-  .lr-tier.active .tr{flex:0 0 100%;min-width:0;margin-top:2px;
+  .lr-tier.active .tr{flex:0 0 100%;min-width:0;margin-top:0;
     font-size:10.5px;line-height:1.4;overflow-wrap:anywhere}
   .lr-tier .tdot{width:5px;height:5px;border-radius:50%;flex-shrink:0;background:#21303b}
   .lr-tier .tn{font-size:7.5px;letter-spacing:1.5px;font-weight:700;text-transform:uppercase;color:#56697b}
@@ -560,6 +564,12 @@ const css = `
     .lr-card{margin-top:16px}
     .lr-pad{padding:20px}
     .report-grid{display:grid;grid-template-columns:1.5fr 1fr;gap:10px;align-items:start}
+    /* The label's box cost the value 12px of a 225px line and left the longest
+       titles 11px short. The box is the point, so it keeps its rule and fill and
+       gives the space back from padding and type instead: 4px sides, 7px, and
+       half the tracking across fifteen characters. Mobile has the room already
+       and is deliberately untouched. */
+    .lr-log-problem-lbl{padding:1px 4px;font-size:7px;letter-spacing:.5px}
     .report-right{display:flex;flex-direction:column;gap:8px}
     .lr-log-mobile{display:none}
   }
@@ -1173,12 +1183,25 @@ function Report({ call, rptNum, imageUrl:imageOverride }) {
             </div>
             <div className="div-h"/>
             <div className="rpt-fields" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 12px",marginTop:".3rem",marginBottom:".6rem"}}>
-              {/* The number stands alone under its label — nothing shares its line. */}
+              {/* How to reach them, both halves on one row: the number, then the
+                  channel they asked for, split by a hairline. The badge wears the
+                  call's tier colour. */}
               <div className="rpt-phone-group" style={{gridColumn:"1 / -1"}}>
-                <span className="field-lbl lr-mono">Phone</span>
-                <div className="rpt-phone-row">
-                  <Icon name="device-mobile" className="field-icon" style={{color:"#56697b"}}/>
-                  <span className="rpt-phone lr-mono">{d.lead?.phone||"Not provided"}</span>
+                <div className="rpt-phone-head">
+                  <div className="rpt-phone-main">
+                    <span className="field-lbl lr-mono">Phone</span>
+                    <div className="rpt-phone-row">
+                      <Icon name="device-mobile" className="field-icon" style={{color:"#56697b"}}/>
+                      <span className="rpt-phone lr-mono">{d.lead?.phone||"Not provided"}</span>
+                    </div>
+                  </div>
+                  {prefers && (
+                    <div className="rpt-pref-col">
+                      <span className="field-lbl lr-mono">Preferred contact</span>
+                      <span className="rpt-prefers lr-mono fs-8"
+                        style={{color:tc.text,borderColor:tc.border,background:tc.bg}}>{prefers}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1187,12 +1210,11 @@ function Report({ call, rptNum, imageUrl:imageOverride }) {
                   when they narrow anything, then the caller's own words in full. */}
               <div style={{gridColumn:"1 / -1"}}>
                 <div className="rpt-reach-card">
-                <div className="sec-title lr-mono fs-8" style={{marginBottom:2,color:"#82a0ba"}}><Icon name="clock"/> Best time to reach</div>
+                <div className="sec-title lr-mono fs-8" style={{marginBottom:0,color:"#82a0ba"}}><Icon name="clock"/> Best time to reach</div>
                 <div className="rpt-reach">
                   {/* body face, not the phone number's monospace — at this size
                       the mono read as a second number rather than as a time */}
                   <span className="rpt-reach-time lr-sans">{d.callback?.time||"Anytime"}</span>
-                  {prefers && <span className="rpt-prefers lr-mono fs-8">{prefers}</span>}
                 </div>
                 {/* All seven lit says "any day", which is what no answer looks
                     like — so the strip only earns its space when it narrows things. */}
@@ -1205,8 +1227,8 @@ function Report({ call, rptNum, imageUrl:imageOverride }) {
                   </div>
                 )}
                 {quote && (
-                  <div style={{marginTop:5}}>
-                    <span className="field-lbl lr-mono">In their words</span>
+                  <div className="rpt-quote-block">
+                    <div className="sec-title lr-mono fs-8" style={{marginBottom:0,color:"#82a0ba"}}><Icon name="message-dots"/> In their words</div>
                     <div className="rpt-quote-line">"{boldTimes(quote)}"</div>
                   </div>
                 )}
