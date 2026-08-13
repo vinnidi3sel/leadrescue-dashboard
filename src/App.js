@@ -110,19 +110,6 @@ function cleanField(v) {
   return (!t || NOT_PROVIDED.test(t)) ? "" : t;
 }
 
-// The caller's own words about timing, trimmed to sit between mid-dots: no
-// trailing period, and cut at a word boundary if it runs long so it cannot
-// push the line to a second row on a narrow phone.
-function timingQuote(note, maxChars) {
-  let t = cleanField(note);
-  if (!t) return "";
-  t = t.replace(/[.\s]+$/, "");
-  if (t.length > maxChars) {
-    t = t.slice(0, maxChars).replace(/[\s,;:]+\S*$/, "").replace(/[\s,;:]+$/, "") + "…";
-  }
-  return t;
-}
-
 // "Call or text" / "Text" / "phone" -> "prefers call or text" / "prefers text".
 // Returns "" when the caller never said, so the mid-dot can be dropped with it.
 function prefersPhrase(pref) {
@@ -441,20 +428,16 @@ const css = `
   .rpt-phone-row .field-icon{font-size:14px}
   .rpt-phone{font-size:clamp(15px,4.2vw,19px);color:#eef3f7;font-weight:700;
     line-height:1.2;letter-spacing:.5px}
-  /* Timing is a modifier on the number above it, not a peer — small, dim, one
-     line, tucked close enough that the two read as a single block. */
-  .rpt-reach{display:flex;align-items:baseline;flex-wrap:nowrap;gap:5px;margin-top:3px;
-    font-size:10px;color:#82a0ba;line-height:1.3}
-  .rpt-reach > span{flex:0 0 auto}
-  .rpt-reach-sep{color:#56697b}
-  /* The caller's wording is the only elastic part of the line: the parsed time
-     and the contact preference are short and fixed, so the quote takes whatever
-     width is left and ellipsises into it. That keeps the whole thing on one row
-     at 375px, where wrapping put it on four. The selector must outrank
-     ".rpt-reach > span" above, or the quote inherits flex-shrink:0 and pushes
-     the preference clean off the side of the screen. */
-  .rpt-reach > .rpt-reach-q{flex:0 1 auto;min-width:0;font-style:italic;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* Parsed time and preference, one line. Short enough now that it needs no
+     flex gymnastics — the quote it used to compete with has its own line. */
+  .rpt-reach{margin-top:1px;font-size:10px;color:#82a0ba;line-height:1.35}
+  .rpt-reach-sep{color:#56697b;margin:0 5px}
+  /* The caller's own words, whole. Wraps to as many lines as it takes. */
+  .rpt-quote-line{margin-top:4px;font-size:10px;color:#82a0ba;font-style:italic;
+    line-height:1.45;overflow-wrap:anywhere}
+  /* Desktop joins the two address halves into one line; the comma belongs to the
+     second half, so it disappears with it when there is no city or state. */
+  .rpt-addr-2::before{content:", "}
   .box{background:#141d25;border:1px solid #21303b;border-radius:3px;padding:.75rem;margin-bottom:8px}
   .box:last-child{margin-bottom:0}
   .lr-day{width:18px;height:18px;border-radius:2px;display:flex;align-items:center;justify-content:center;border:1px solid #21303b;background:#0d141b}
@@ -537,15 +520,12 @@ const css = `
        number sits just under it rather than over it */
     .rpt-phone{font-size:17px}
     .rpt-phone-row .field-icon{font-size:15px}
-    /* A phone has no room for time, a quote and a preference on one row, so the
-       quote stops shrinking and reads whole instead. Flow it as text rather than
-       as flex: wrapped flex lines put each separator on a row of its own and
-       took five, where inline text reflows into two. */
-    .rpt-reach{display:block;font-size:11px}
-    .rpt-reach > span{display:inline}
-    .rpt-reach-sep{margin:0 5px}
-    .rpt-reach > .rpt-reach-q{display:inline;white-space:normal;
-      overflow:visible;text-overflow:clip}
+    .rpt-reach{font-size:12px}
+    .rpt-quote-line{font-size:12px}
+    /* street on one line, city and state on the next: joined, the two wrapped
+       awkwardly mid-address at this width */
+    .rpt-addr-2{display:block}
+    .rpt-addr-2::before{content:none}
     /* belt and braces: a grid item defaults to min-width:auto, so without this
        a longer address than any seen so far could overflow again */
     .rpt-fields > div{min-width:0}
@@ -1044,19 +1024,17 @@ function Report({ call, rptNum, imageUrl:imageOverride }) {
   const days = d.callback?.days || [];
   const dayCount = DAY_KEYS.filter(dk => isDayActive(dk, days)).length;
   const prefers = prefersPhrase(d.lead?.preferred_contact);
-  // One address line, built from whatever actually exists. Three stacked lines
-  // left a ragged column with the width beside it empty, and an absent city or
-  // state used to leave a blank row or a dangling comma.
+  // Split in two so the platforms can differ: one line on desktop, two on a
+  // phone. Each half is filtered, so an absent city or state leaves neither a
+  // blank row nor a dangling comma.
   const addrParts = cleanField(d.lead?.address_line2).split(",");
-  const addrLine = [
-    cleanField(d.lead?.address_line1),
-    cleanField(addrParts[0]),
-    cleanField(addrParts.slice(1).join(","))
-  ].filter(Boolean).join(", ");
-  // 60, not 40: at 40 most real quotes were cut mid-phrase — "Preferably, in the
-  // morning, on the…" — and an ellipsis landing there reads as a rendering fault
-  // rather than as an abbreviation. Anything past 60 still cuts on a word.
-  const quote = timingQuote(d.callback?.note, 60);
+  const addrStreet = cleanField(d.lead?.address_line1);
+  const addrRest = [cleanField(addrParts[0]), cleanField(addrParts.slice(1).join(","))]
+    .filter(Boolean).join(", ");
+  // Verbatim and complete. It has its own line now rather than a share of one,
+  // so there is nothing to truncate against — every earlier limit existed only
+  // to stop it pushing the contact preference off the row.
+  const quote = cleanField(d.callback?.note);
   const imageUrl = imageOverride ?? call.image_url ?? null;
 
   return (
@@ -1124,21 +1102,22 @@ function Report({ call, rptNum, imageUrl:imageOverride }) {
             </div>
             <div className="div-h"/>
             <div className="rpt-fields" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 12px",marginTop:".3rem",marginBottom:".6rem"}}>
-              {/* Phone and its timing are one unit, not two fields. The number is
-                  what gets acted on, so it carries the weight; the timing is a
-                  modifier on it and sits small and dim directly beneath. */}
+              {/* The number stands alone under its label — nothing shares its line. */}
               <div className="rpt-phone-group" style={{gridColumn:"1 / -1"}}>
                 <span className="field-lbl lr-mono">Phone</span>
                 <div className="rpt-phone-row">
                   <Icon name="device-mobile" className="field-icon" style={{color:"#56697b"}}/>
                   <span className="rpt-phone lr-mono">{d.lead?.phone||"Not provided"}</span>
                 </div>
-                {/* parsed time, then the caller's own words, then how they want
-                    to be contacted — the order the question was actually asked in */}
+              </div>
+
+              {/* Timing is its own labelled block: parsed value and preference on
+                  one line, the days beneath when they narrow anything, then the
+                  caller's own words in full on a line of their own. */}
+              <div style={{gridColumn:"1 / -1"}}>
+                <span className="field-lbl lr-mono">Best time to reach</span>
                 <div className="rpt-reach lr-mono">
                   <span>{d.callback?.time||"Anytime"}</span>
-                  {quote && <span className="rpt-reach-sep">·</span>}
-                  {quote && <span className="rpt-reach-q">"{quote}"</span>}
                   {prefers && <span className="rpt-reach-sep">·</span>}
                   {prefers && <span>{prefers}</span>}
                 </div>
@@ -1152,14 +1131,21 @@ function Report({ call, rptNum, imageUrl:imageOverride }) {
                     })}
                   </div>
                 )}
+                {quote && <div className="rpt-quote-line">"{quote}"</div>}
               </div>
+
               {/* separates "how to reach them" from "where is it" */}
               <div className="div-h" style={{gridColumn:"1 / -1"}}/>
               <div style={{gridColumn:"1 / -1"}}>
                 <span className="field-lbl lr-mono">Service address</span>
                 <div style={{display:"flex",alignItems:"flex-start",gap:4}}>
                   <Icon name="map-pin" className="field-icon" style={{color:"#56697b",marginTop:1}}/>
-                  <div className="field-val lr-mono">{addrLine || "Not provided"}</div>
+                  {/* one line on desktop, two on a phone — the comma is drawn by
+                      CSS so the split leaves nothing dangling */}
+                  <div className="rpt-addr field-val lr-mono">
+                    <span>{addrStreet || "Not provided"}</span>
+                    {addrRest && <span className="rpt-addr-2">{addrRest}</span>}
+                  </div>
                 </div>
               </div>
             </div>
